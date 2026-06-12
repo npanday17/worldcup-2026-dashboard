@@ -25,7 +25,7 @@ Source of truth:
 ```bash
 npm install            # one-time: installs jsdom + sql.js (dev/test only)
 npm run build          # assemble index.html from the sources (fast)
-npm run test           # run the math/logic checks (expect "22 passed, 0 failed")
+npm run test           # run the math/logic checks (expect "27 passed, 0 failed")
 npm run rebuild        # re-run calibration THEN assemble (see below for when)
 npm run deploy         # vercel --prod  (needs the Vercel CLI + login)
 ```

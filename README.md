@@ -6,6 +6,7 @@ A single-page, fully client-side dashboard:
 - **Polymarket %** — live prices auto-fetched from Polymarket; per-team **Edge / EV / BUY-SELL-HOLD** signals.
 - **Interactive bracket** — pick group 1/2/3 and knockout winners; championship + round-by-round odds recompute live (Monte Carlo).
 - **Live results** — match scores & goal scorers from ESPN automatically condition the odds.
+- **Golden Boot** — live top-scorers (actual goals from ESPN) joined with Polymarket's Golden Boot market price.
 - **Save** — named scenarios + export/import, and a real **SQLite** database (snapshots of odds/edges) you can query anywhere.
 
 ## Quick start
@@ -23,7 +24,7 @@ Do not open `index.html` via `file://` — the live fetches and storage need a r
 | Command | What it does |
 |---|---|
 | `npm run build` | Rebuild `index.html` from `ui_template.html` + `engine.js` + `data.json` |
-| `npm test` | Run the math/logic checks (expect "22 passed, 0 failed") |
+| `npm test` | Run the math/logic checks (expect "27 passed, 0 failed") |
 | `npm run rebuild` | Re-run calibration **then** build (only when odds / team list / engine change) |
 | `npm run deploy` | `vercel --prod` |
 

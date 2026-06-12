@@ -182,6 +182,7 @@
     <div class="tab" data-tab="groups">Group Stage</div>
     <div class="tab" data-tab="bracket">Knockout Bracket</div>
     <div class="tab" data-tab="matches">Matches & Scorers</div>
+    <div class="tab" data-tab="golden">Golden Boot</div>
   </div>
 
   <!-- ODDS TAB -->
@@ -223,6 +224,26 @@
       <button class="btn" id="refreshResults">↻ Refresh</button>
     </div>
     <div id="matchesWrap"></div>
+  </section>
+
+  <!-- GOLDEN BOOT TAB -->
+  <section id="tab-golden" class="panel hide">
+    <div class="row" style="align-items:center;margin-bottom:8px">
+      <div class="small muted flex1">Live top scorers from ESPN (own goals excluded; penalties counted) joined with Polymarket's <b>Golden Boot</b> market. No model edge here — the simulation models teams, not individual players, so this is descriptive: actual goals vs the market's title price.</div>
+      <button class="btn primary" id="fetchGB">⤓ Live Golden Boot</button>
+    </div>
+    <div class="small muted" id="gbStamp" style="margin:-2px 0 6px">Golden Boot odds: not loaded — click “Live Golden Boot” (or it loads with auto-Polymarket).</div>
+    <div style="overflow:auto;max-height:70vh">
+      <table class="odds" id="gbTable">
+        <thead><tr id="gbHead"></tr></thead>
+        <tbody id="gbBody"></tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span>Goals = actual goals scored so far (ESPN). <b>(Np)</b> = N from penalties.</span>
+      <span>GB % = Polymarket Golden Boot price (loads with auto-Polymarket or the button).</span>
+      <span>Fair dec = 1 / GB price. — = no price / no goals yet.</span>
+    </div>
   </section>
 
   <details class="help">
@@ -522,7 +543,37 @@
     return { run: run, runChampOnly: runChampOnly, simulate: simulate, pKO: pKO, KO_ORDER: KO_ORDER, R32: R32, LATER: LATER, THIRD_SLOT_MATCH: THIRD_SLOT_MATCH, THIRD_SLOT_LETTERS: THIRD_SLOT_LETTERS };
   }
 
-  var api = { Engine: Engine, mulberry32: mulberry32, R32: R32, LATER: LATER };
+  // Aggregate goal scorers from played matches into a Golden Boot leaderboard.
+  // Pure (no DOM); shared by the browser tab and Node tests.
+  // Input: array of game objects { home:{name}, away:{name}, scorers:[{name,side,og,pen}] }.
+  // Own goals are excluded from a player's tally (standard Golden Boot rule); penalties count.
+  // Names are normalised (lowercased, accents stripped, alphanumerics only) so the same
+  // key joins ESPN scorer names to Polymarket player names. Returns rows sorted by goals desc.
+  function normName(s) {
+    return (s || '').toLowerCase().normalize('NFD')
+      .replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+  }
+  function aggregateScorers(games) {
+    var map = {};
+    (games || []).forEach(function (g) {
+      (g.scorers || []).forEach(function (sc) {
+        if (sc.og) return; // own goal: not credited to the scorer
+        var key = normName(sc.name);
+        if (!key) return;
+        var team = (sc.side === 'home') ? (g.home && g.home.name) : (g.away && g.away.name);
+        if (!map[key]) map[key] = { key: key, name: sc.name, team: team || '', goals: 0, pens: 0 };
+        map[key].goals++;
+        if (sc.pen) map[key].pens++;
+        if (!map[key].team && team) map[key].team = team;
+      });
+    });
+    var arr = Object.keys(map).map(function (k) { return map[k]; });
+    arr.sort(function (a, b) { return b.goals - a.goals || a.name.localeCompare(b.name); });
+    return arr;
+  }
+
+  var api = { Engine: Engine, mulberry32: mulberry32, R32: R32, LATER: LATER,
+    aggregateScorers: aggregateScorers, normName: normName };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.WCEngine = api;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -933,7 +984,7 @@
     setStatus(true,'Picks changed — recomputing…');
     dirtyTimer=setTimeout(runCompute,120);
   }
-  function renderAll(){ renderHead(); renderTable(); renderGroups(); renderBracket(); }
+  function renderAll(){ renderHead(); renderTable(); renderGroups(); renderBracket(); renderGolden(); }
 
   /* ---------------- controls ---------------- */
   document.getElementById('simSel').onchange=e=>{ state.sims=+e.target.value; scheduleCompute(); };
@@ -961,7 +1012,7 @@
     tab.onclick=()=>{
       document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
       tab.classList.add('active');
-      ['odds','groups','bracket','matches'].forEach(id=>{
+      ['odds','groups','bracket','matches','golden'].forEach(id=>{
         document.getElementById('tab-'+id).classList.toggle('hide', id!==tab.dataset.tab);
       });
     };
@@ -1030,7 +1081,72 @@
     renderTable();
     return true;
   }
-  document.getElementById('fetchPM').onclick=()=>fetchPolymarket(false);
+  document.getElementById('fetchPM').onclick=()=>{ fetchPolymarket(false); fetchGoldenBoot(false); };
+
+  /* ---------------- GOLDEN BOOT (Polymarket top-scorer market) ---------------- */
+  // window.__gb : { normalisedName -> {name, price(0..1)} }
+  const GB_ENDPOINT='https://gamma-api.polymarket.com/events?slug=world-cup-golden-boot-winner';
+  async function fetchGoldenBoot(silent){
+    const stamp=document.getElementById('gbStamp');
+    stamp.textContent='Golden Boot: fetching live prices…';
+    let data=null,lastErr=null;
+    try{
+      const res=await fetch(GB_ENDPOINT+'&_t='+Date.now(),{headers:{'accept':'application/json'}});
+      if(!res.ok) lastErr='HTTP '+res.status;
+      else { const j=await res.json(); data=Array.isArray(j)?j[0]:j; }
+    }catch(e){ lastErr=(e&&e.message)||'network/CORS error'; }
+    if(!data||!data.markets){
+      stamp.innerHTML='⚠️ Live Golden Boot fetch failed ('+(lastErr||'unknown')+'). '+
+        'Opening over http(s) (not file://) is required for the cross-site request.';
+      if(!silent) console.warn('Golden Boot fetch failed:',lastErr);
+      return false;
+    }
+    const gb={}; let n=0;
+    data.markets.forEach(m=>{
+      const nm=m.groupItemTitle; if(!nm) return;
+      const p=priceFromMarket(m); if(p===null) return;
+      gb[norm(nm)]={name:nm, price:p}; n++;
+    });
+    window.__gb=gb;
+    const now=new Date();
+    stamp.innerHTML='✅ Golden Boot live: <b>'+n+'</b> players priced at '+now.toLocaleTimeString()+
+      ' &nbsp;<span class="muted">(mid-price; source: gamma-api.polymarket.com)</span>';
+    renderGolden();
+    return true;
+  }
+  function renderGolden(){
+    const gb=window.__gb||(window.__gb={});
+    const games=Object.values((RESULTS&&RESULTS.byGame)||{});
+    const board=WCEngine.aggregateScorers(games); // [{key,name,team,goals,pens}]
+    const rows=[], seen={};
+    board.forEach(s=>{ const m=gb[s.key]; seen[s.key]=true;
+      rows.push({name:s.name,team:s.team,goals:s.goals,pens:s.pens,price:m?m.price:null}); });
+    Object.keys(gb).forEach(k=>{ if(seen[k]) return; const m=gb[k];
+      rows.push({name:m.name,team:'',goals:0,pens:0,price:m.price}); });
+    rows.sort((a,b)=> b.goals-a.goals || ((b.price||0)-(a.price||0)) || a.name.localeCompare(b.name));
+    document.getElementById('gbHead').innerHTML=
+      '<th>#</th><th style="text-align:left">Player</th><th style="text-align:left">Team</th><th>Goals</th><th>GB %</th><th>Fair dec</th>';
+    const body=document.getElementById('gbBody'); body.innerHTML='';
+    if(!rows.length){ body.innerHTML='<tr><td colspan="6" class="muted small" style="text-align:left">No goals scored yet and Golden Boot odds not loaded — click “Live Golden Boot”.</td></tr>'; return; }
+    rows.forEach((r,idx)=>{
+      const tid=teamIdFromName(r.team);
+      const flag = tid!=null ? flagHTML(T[tid].name) : '';
+      const teamNm = tid!=null ? T[tid].name : (r.team||'');
+      const goalsCell = r.goals>0 ? ('<b>'+r.goals+'</b>'+(r.pens?' <span class="muted">('+r.pens+'p)</span>':'')) : '<span class="muted">·</span>';
+      const gbCell = (r.price!=null) ? (r.price*100).toFixed(1) : '<span class="muted">—</span>';
+      const decCell = (r.price>0) ? (1/r.price).toFixed(1) : '—';
+      const tr=document.createElement('tr');
+      tr.innerHTML=
+        '<td>'+(idx+1)+'</td>'+
+        '<td style="text-align:left">'+r.name+'</td>'+
+        '<td style="text-align:left"><div class="teamcell">'+flag+(teamNm||'<span class="muted">—</span>')+'</div></td>'+
+        '<td>'+goalsCell+'</td>'+
+        '<td>'+gbCell+'</td>'+
+        '<td class="muted">'+decCell+'</td>';
+      body.appendChild(tr);
+    });
+  }
+  document.getElementById('fetchGB').onclick=()=>fetchGoldenBoot(false);
 
   /* ---------------- LIVE RESULTS (ESPN) ---------------- */
   const RESULTS={byGame:{},ok:false,error:null,lastUpdated:null,completed:0,live:0,total:0};
@@ -1097,7 +1213,7 @@
   }
   function resultsSig(){ return Object.values(RESULTS.byGame||{}).map(g=>g.id+':'+g.home.score+'-'+g.away.score+':'+g.state).sort().join('|'); }
   let lastSig='';
-  function maybeRecompute(){ const s=resultsSig(); if(s!==lastSig){ lastSig=s; runCompute(); } else { renderMatches(); renderGroups(); renderBracket(); } }
+  function maybeRecompute(){ const s=resultsSig(); if(s!==lastSig){ lastSig=s; runCompute(); } else { renderMatches(); renderGroups(); renderBracket(); renderGolden(); } }
   function updateResultsBanner(){
     const el=document.getElementById('resultsBanner'); if(!el) return;
     if(!RESULTS.ok){ el.innerHTML='📡 Live results unavailable'+(RESULTS.error?(' ('+RESULTS.error+')'):'')+' — odds use market baseline + your manual picks. <a href="#" id="retryResults">Retry</a>';
@@ -1291,7 +1407,7 @@
   }
   if(!restored) runCompute();
   if(!lsOK) scenMsg('Browser storage is unavailable here — named saves & auto-restore are off, but Export/Import to a file still works.',true);
-  if(document.getElementById('autoPM').checked){ fetchPolymarket(true); }
+  if(document.getElementById('autoPM').checked){ fetchPolymarket(true); fetchGoldenBoot(true); }
   // live results → condition odds, then poll
   fetchResults(false).then(()=>{ lastSig=resultsSig(); runCompute(); setInterval(()=>fetchResults(false).then(maybeRecompute), 60000); });
 })();

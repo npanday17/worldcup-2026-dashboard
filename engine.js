@@ -286,7 +286,37 @@
     return { run: run, runChampOnly: runChampOnly, simulate: simulate, pKO: pKO, KO_ORDER: KO_ORDER, R32: R32, LATER: LATER, THIRD_SLOT_MATCH: THIRD_SLOT_MATCH, THIRD_SLOT_LETTERS: THIRD_SLOT_LETTERS };
   }
 
-  var api = { Engine: Engine, mulberry32: mulberry32, R32: R32, LATER: LATER };
+  // Aggregate goal scorers from played matches into a Golden Boot leaderboard.
+  // Pure (no DOM); shared by the browser tab and Node tests.
+  // Input: array of game objects { home:{name}, away:{name}, scorers:[{name,side,og,pen}] }.
+  // Own goals are excluded from a player's tally (standard Golden Boot rule); penalties count.
+  // Names are normalised (lowercased, accents stripped, alphanumerics only) so the same
+  // key joins ESPN scorer names to Polymarket player names. Returns rows sorted by goals desc.
+  function normName(s) {
+    return (s || '').toLowerCase().normalize('NFD')
+      .replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
+  }
+  function aggregateScorers(games) {
+    var map = {};
+    (games || []).forEach(function (g) {
+      (g.scorers || []).forEach(function (sc) {
+        if (sc.og) return; // own goal: not credited to the scorer
+        var key = normName(sc.name);
+        if (!key) return;
+        var team = (sc.side === 'home') ? (g.home && g.home.name) : (g.away && g.away.name);
+        if (!map[key]) map[key] = { key: key, name: sc.name, team: team || '', goals: 0, pens: 0 };
+        map[key].goals++;
+        if (sc.pen) map[key].pens++;
+        if (!map[key].team && team) map[key].team = team;
+      });
+    });
+    var arr = Object.keys(map).map(function (k) { return map[k]; });
+    arr.sort(function (a, b) { return b.goals - a.goals || a.name.localeCompare(b.name); });
+    return arr;
+  }
+
+  var api = { Engine: Engine, mulberry32: mulberry32, R32: R32, LATER: LATER,
+    aggregateScorers: aggregateScorers, normName: normName };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.WCEngine = api;
 })(typeof window !== 'undefined' ? window : globalThis);

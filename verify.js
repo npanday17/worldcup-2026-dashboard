@@ -89,5 +89,25 @@ ok(Math.abs(sum(cst.champ)-1)<0.01,'conditioned champion probs still sum to 1 ('
 const frI=T.findIndex(t=>t.name==='France');
 ok(cst.champ[frI]>champ[frI],'eliminating-ish Spain lifts France title prob ('+(champ[frI]*100).toFixed(2)+'% -> '+(cst.champ[frI]*100).toFixed(2)+'%)');
 
+// --- Golden Boot scorer aggregation (own goals excluded, pens counted, accent-normalised join) ---
+const scGames=[
+  {home:{name:'France'},away:{name:'Spain'},scorers:[
+    {name:'Kylian Mbappé',side:'home',pen:false,og:false},
+    {name:'Kylian Mbappé',side:'home',pen:true,og:false},
+    {name:'Own Goalsson',side:'away',pen:false,og:true}
+  ]},
+  {home:{name:'France'},away:{name:'Brazil'},scorers:[
+    {name:'Kylian Mbappe',side:'home',pen:false,og:false}, // no accent: must merge with the accented entries
+    {name:'Raphinha',side:'away',pen:false,og:false}
+  ]}
+];
+const board=WCEngine.aggregateScorers(scGames);
+const mb=board.find(r=>r.key==='kylianmbappe');
+ok(mb && mb.goals===3,'Mbappé tally merges accent/no-accent names -> 3 goals ('+(mb&&mb.goals)+')');
+ok(mb && mb.pens===1,'Mbappé penalty counted once ('+(mb&&mb.pens)+')');
+ok(mb && mb.team==='France','scorer team derived from match side ('+(mb&&mb.team)+')');
+ok(!board.some(r=>r.name==='Own Goalsson'),'own goal excluded from scorer board');
+ok(board.length===2 && board[0].key==='kylianmbappe','board sorted by goals desc, OG-only player dropped ('+board.length+' rows)');
+
 console.log('\n'+pass+' passed, '+fail+' failed.');
 process.exit(fail?1:0);
