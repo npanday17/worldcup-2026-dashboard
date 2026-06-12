@@ -85,6 +85,11 @@
     var annex = D.annex;          // key 'ABCDEFGH' -> [8 third-letters in slot order A,B,D,E,G,I,K,L]
 
     function pKO(i, j) { return expR[i] / (expR[i] + expR[j]); }
+    // Single group-match outcome probabilities (Davidson model — same math simulate() uses).
+    function pGroup(i, j) {
+      var ei = expR[i], ej = expR[j], dr = nu * Math.sqrt(ei * ej), tot = ei + ej + dr;
+      return { win: ei / tot, draw: dr / tot, loss: ej / tot };
+    }
     // goal samplers for simulated group matches (used only for GD/GF tiebreakers)
     function sampleMargin(rnd){ var x=rnd(); return x<0.52?1:(x<0.82?2:(x<0.95?3:4)); }
     function sampleLoser(rnd){ var x=rnd(); return x<0.60?0:(x<0.90?1:2); }
@@ -283,7 +288,7 @@
       return out;
     }
 
-    return { run: run, runChampOnly: runChampOnly, simulate: simulate, pKO: pKO, KO_ORDER: KO_ORDER, R32: R32, LATER: LATER, THIRD_SLOT_MATCH: THIRD_SLOT_MATCH, THIRD_SLOT_LETTERS: THIRD_SLOT_LETTERS };
+    return { run: run, runChampOnly: runChampOnly, simulate: simulate, pKO: pKO, pGroup: pGroup, KO_ORDER: KO_ORDER, R32: R32, LATER: LATER, THIRD_SLOT_MATCH: THIRD_SLOT_MATCH, THIRD_SLOT_LETTERS: THIRD_SLOT_LETTERS };
   }
 
   // Aggregate goal scorers from played matches into a Golden Boot leaderboard.

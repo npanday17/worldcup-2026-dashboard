@@ -117,6 +117,18 @@
   .mmeta{margin-top:2px}
   .mmeta.mlive{color:var(--warn);font-weight:600}
   .scorers{margin-top:3px}
+  /* match prediction (model odds for unplayed games) */
+  .pred{margin-top:6px}
+  .predbar{display:flex;height:7px;border-radius:4px;overflow:hidden;background:var(--panel)}
+  .predbar .seg{display:block;height:100%}
+  .predbar .seg-h{background:#4ea1ff}
+  .predbar .seg-d{background:#56627a}
+  .predbar .seg-a{background:#f6a23c}
+  .predlabs{display:flex;justify-content:space-between;gap:8px;margin-top:3px;font-size:11px;color:var(--mut)}
+  .predlabs .plab{white-space:nowrap}
+  .predlabs .plab.a{text-align:right}
+  .predlabs .plab .dot2{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:4px;vertical-align:middle}
+  .predlabs .plab b{color:var(--txt);font-weight:600}
   @media (max-width:640px){ .title p{display:none} }
 </style>
 </head>
@@ -220,7 +232,7 @@
   <!-- MATCHES TAB -->
   <section id="tab-matches" class="panel hide">
     <div class="row" style="align-items:center;margin-bottom:8px">
-      <div class="small muted flex1">Live scores &amp; goal scorers from ESPN. Completed matches automatically condition the fair odds (group standings use real goal difference; knockout winners lock the bracket). <b>In-progress</b> matches are not yet applied until final.</div>
+      <div class="small muted flex1">Full schedule with live scores &amp; goal scorers from ESPN. <b>Upcoming</b> matches show the model's win / draw / win odds (% and decimal). Completed matches automatically condition the fair odds (group standings use real goal difference; knockout winners lock the bracket). <b>In-progress</b> matches are not applied until final.</div>
       <button class="btn" id="refreshResults">↻ Refresh</button>
     </div>
     <div id="matchesWrap"></div>
@@ -874,12 +886,19 @@
   async function pool(items,n,fn){ const q=items.slice(),runners=[]; for(let k=0;k<Math.min(n,q.length);k++){ runners.push((async()=>{ while(q.length){ await fn(q.shift()); } })()); } await Promise.all(runners); }
   async function fetchResults(force){
     const endY='20260719'; const today=new Date(); const todayY=ymd(today);
-    const plus2=ymd(new Date(today.getTime()+2*864e5));
-    const lastY=(plus2<endY)?plus2:endY;
+    const plus1=ymd(new Date(today.getTime()+864e5));
+    const lastY=endY; // fetch the full tournament schedule so upcoming fixtures show with predicted odds
     const days=[]; let d=new Date(Date.UTC(2026,5,11));
     while(ymd(d)<=lastY){ days.push(ymd(d)); d=new Date(d.getTime()+864e5); }
     let games={},okAny=false,err=null; const toFetch=[];
-    days.forEach(day=>{ const c=force?null:cacheGetDay(day); if(c&&c.frozen&&c.games){ c.games.forEach(g=>games[g.id]=g); okAny=true; } else toFetch.push(day); });
+    days.forEach(day=>{
+      const c=force?null:cacheGetDay(day);
+      // serve from cache for frozen past days AND already-cached future days (fixtures are stable);
+      // only the live window (through tomorrow) is re-fetched every poll for score updates.
+      const stableFuture=c&&c.games&&day>plus1;
+      if(c&&c.games&&(c.frozen||stableFuture)){ c.games.forEach(g=>games[g.id]=g); okAny=true; }
+      else toFetch.push(day);
+    });
     await pool(toFetch,6, async day=>{
       try{
         let res=null;
@@ -912,8 +931,34 @@
   }
   function fmtScorer(s){ return s.name+(s.clock?(' '+s.clock.replace(/'+$/,'')+"'"):'')+(s.pen?' (P)':'')+(s.og?' (OG)':''); }
   function fmtDay(iso){ try{ return new Date(iso+'T12:00:00Z').toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'}); }catch(e){ return iso; } }
+  // ---- model odds for unplayed matches ----
+  function pct0(p){ return (p*100).toFixed(0); }
+  function decOdd(p){ return p>0 ? (1/p).toFixed(2) : '—'; }
+  function predBar(segs){
+    const bar=segs.map(s=>'<i class="seg seg-'+s.k+'" style="width:'+(s.p*100).toFixed(1)+'%"></i>').join('');
+    const labs=segs.map((s,i)=>'<span class="plab'+(i===segs.length-1?' a':'')+'"><span class="dot2" style="background:'+s.c+'"></span><b>'+s.lab+'</b> '+pct0(s.p)+'% · '+decOdd(s.p)+'</span>').join('');
+    return '<div class="pred"><div class="predbar">'+bar+'</div><div class="predlabs">'+labs+'</div></div>';
+  }
+  function predictHTML(g){
+    const ha=teamIdFromName(g.home.name), aw=teamIdFromName(g.away.name);
+    if(ha==null||aw==null) return ''; // unresolved teams (e.g., a not-yet-decided knockout slot)
+    if(g.round==='group'){
+      const p=eng.pGroup(ha,aw);
+      return predBar([
+        {k:'h',c:'#4ea1ff',lab:g.home.name,p:p.win},
+        {k:'d',c:'#56627a',lab:'Draw',p:p.draw},
+        {k:'a',c:'#f6a23c',lab:g.away.name,p:p.loss}
+      ]);
+    }
+    const pw=eng.pKO(ha,aw);
+    return predBar([
+      {k:'h',c:'#4ea1ff',lab:g.home.name,p:pw},
+      {k:'a',c:'#f6a23c',lab:g.away.name,p:1-pw}
+    ]);
+  }
   function matchRowHTML(g){
     const live=g.state==='in', done=g.completed;
+    const pred=(!done&&!live)?predictHTML(g):'';
     const sc=(done||live)?(g.home.score+'–'+g.away.score):'';
     const time=done?(g.status||'FT'):live?(g.status||'LIVE'):(function(){try{return new Date(g.dateISO).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return '';}})();
     const hw=g.home.winner?'font-weight:700':'', aw=g.away.winner?'font-weight:700':'';
@@ -926,7 +971,7 @@
         '<div class="msc">'+(sc||'<span class="muted small">v</span>')+'</div>'+
         '<div class="mt away" style="'+aw+'"><span>'+g.away.name+'</span>'+flagHTML(g.away.name)+'</div>'+
       '</div>'+
-      '<div class="mmeta small '+(live?'mlive':'muted')+'">'+time+'</div>'+sH+'</div>';
+      '<div class="mmeta small '+(live?'mlive':'muted')+'">'+time+'</div>'+pred+sH+'</div>';
   }
   function renderMatches(){
     const wrap=document.getElementById('matchesWrap'); if(!wrap) return;

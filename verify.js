@@ -122,5 +122,13 @@ const stp=eng.run({},80000,29);
 ok(mae(stp.qf,qft)<0.04,'sim QF anchored near progression market (mae='+(mae(stp.qf,qft)*100).toFixed(2)+'pp)');
 ok(mae(stp.sf,sft)<0.04,'sim SF anchored near progression market (mae='+(mae(stp.sf,sft)*100).toFixed(2)+'pp)');
 
+// --- pGroup single-match odds (Davidson) for the score page ---
+const fr2=T.findIndex(t=>t.name==='France'), ha2=T.findIndex(t=>t.name==='Haiti');
+const pg=eng.pGroup(fr2,ha2);
+ok(Math.abs((pg.win+pg.draw+pg.loss)-1)<1e-9,'pGroup outcomes sum to 1 ('+(pg.win+pg.draw+pg.loss).toFixed(6)+')');
+ok(pg.win>pg.loss,'stronger team (France) more likely to beat Haiti ('+(pg.win*100).toFixed(1)+'% vs '+(pg.loss*100).toFixed(1)+'%)');
+const pgRev=eng.pGroup(ha2,fr2);
+ok(Math.abs(pg.win-pgRev.loss)<1e-9 && Math.abs(pg.draw-pgRev.draw)<1e-9,'pGroup is side-symmetric (win/loss swap, draw equal)');
+
 console.log('\n'+pass+' passed, '+fail+' failed.');
 process.exit(fail?1:0);
