@@ -48,15 +48,27 @@ which are flaky or blocked under `file://`. Serve it:
 ```bash
 python3 -m http.server 8000   # then open http://localhost:8000/index.html
 ```
+The `/api/*` proxy functions (see below) do **not** run under `python http.server` — the page
+detects the 404 and falls back to fetching the upstreams directly, so local dev still works.
+To exercise the proxy locally, use `vercel dev` instead.
 
 ## Live data sources (browser-side, no API keys)
-- Polymarket prices: `gamma-api.polymarket.com/events?slug=world-cup-winner`
-- Match results + scorers: `site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=YYYYMMDD`
-- SQLite engine (sql.js WASM): cdnjs. All others are inlined / offline-capable.
+Fetched **proxy-first** (`/api/*` below) with a **direct-upstream fallback**, so the app
+survives upstream CORS changes in prod and still works in local `python http.server`:
+- Polymarket prices: `/api/polymarket?slug=world-cup-winner` → `gamma-api.polymarket.com`
+- Golden Boot odds: `/api/polymarket?slug=world-cup-golden-boot-winner` → `gamma-api.polymarket.com`
+- Match results + scorers: `/api/espn?dates=YYYYMMDD` → `site.api.espn.com/.../fifa.world/scoreboard`
+- SQLite engine (sql.js WASM): cdnjs (direct). All others are inlined / offline-capable.
+
+## Serverless proxy (`api/`)
+- `api/polymarket.js`, `api/espn.js` — Vercel functions that front the upstreams with a strict
+  **allowlist** (only the two WC slugs / `YYYYMMDD` dates) and `Cache-Control: s-maxage`, so
+  Vercel's CDN serves one shared cached copy to all visitors (cuts upstream calls + invocations).
+- Free on the Vercel Hobby plan (1M invocations/mo, no overage charges).
 
 ## Deploy notes
-- Only `index.html` + `vercel.json` are needed on Vercel; everything else is build/dev tooling.
-- Static site, framework preset "Other", no build command, no env vars.
+- `index.html` + `vercel.json` + the `api/` functions are what run on Vercel; the rest is build/dev tooling.
+- Static site + serverless functions, framework preset "Other", no build command, no env vars.
 
 ## Tests must stay green
 After any change to `engine.js`, `calibrate.js`, or the conditioning logic in

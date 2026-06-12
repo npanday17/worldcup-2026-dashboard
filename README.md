@@ -41,7 +41,15 @@ Do not open `index.html` via `file://` — the live fetches and storage need a r
 
 See `CLAUDE.md` for the full pipeline (it's the project guide Claude Code reads).
 
+## Live data proxy (`api/`)
+
+`api/polymarket.js` and `api/espn.js` are Vercel serverless functions that front the
+Polymarket and ESPN APIs with a strict allowlist and CDN caching (`s-maxage`), hardening the
+app against upstream CORS changes. The client fetches proxy-first with a direct-upstream
+fallback, so `python http.server` still works locally (the `/api/*` 404s fall back to direct).
+Free on Vercel's Hobby plan. Use `vercel dev` to run the functions locally.
+
 ## Deploy (Vercel)
 
-Only `index.html` + `vercel.json` are needed on the host. Static site, framework preset
-"Other", no build command, no env vars, no API keys.
+`index.html` + `vercel.json` + the `api/` functions run on the host. Static site + serverless
+functions, framework preset "Other", no build command, no env vars, no API keys.
