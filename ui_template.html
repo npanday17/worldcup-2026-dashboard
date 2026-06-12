@@ -128,6 +128,15 @@
   .predlabs .plab.a{text-align:right}
   .predlabs .plab .dot2{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:4px;vertical-align:middle}
   .predlabs .plab b{color:var(--txt);font-weight:600}
+  /* matches tab: group-wise layout (two groups side by side) */
+  .msec{margin:14px 0 8px;font-size:14px}
+  .mgroups{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .mgcard{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px}
+  .mgh{font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px}
+  .mgh .gl{background:var(--accd);border-radius:6px;padding:1px 8px;font-size:12px}
+  .mgday{margin:8px 0 3px}
+  .mgcard .matchrow{background:var(--panel);}
+  @media (max-width:760px){ .mgroups{grid-template-columns:1fr} }
   @media (max-width:640px){ .title p{display:none} }
 </style>
 </head>
@@ -222,7 +231,7 @@
   <!-- MATCHES TAB -->
   <section id="tab-matches" class="panel hide">
     <div class="row" style="align-items:center;margin-bottom:8px">
-      <div class="small muted flex1">Full schedule with live scores &amp; goal scorers from ESPN. <b>Upcoming</b> matches show the model's win / draw / win odds (% and decimal). Completed matches automatically condition the fair odds (group standings use real goal difference; knockout winners lock the bracket). <b>In-progress</b> matches are not applied until final.</div>
+      <div class="small muted flex1">Full schedule with live scores &amp; goal scorers from ESPN. <b>Upcoming</b> matches show the model's win / draw / win probabilities. Completed matches automatically condition the fair odds (group standings use real goal difference; knockout winners lock the bracket). <b>In-progress</b> matches are not applied until final.</div>
       <button class="btn" id="refreshResults">↻ Refresh</button>
     </div>
     <div id="matchesWrap"></div>
@@ -243,8 +252,7 @@
     </div>
     <div class="legend">
       <span>Goals = actual goals scored so far (ESPN). <b>(Np)</b> = N from penalties.</span>
-      <span>GB % = Polymarket Golden Boot price (loads with auto-Polymarket or the button).</span>
-      <span>Fair dec = 1 / GB price. — = no price / no goals yet.</span>
+      <span>GB % = Polymarket Golden Boot price (loads with auto-Polymarket or the button). — = no price / no goals yet.</span>
     </div>
   </section>
 
@@ -316,7 +324,6 @@
 
   // ---- helpers ----
   const pctF = x => (x*100).toFixed(2);
-  const fmtDec = p => p<=0 ? '—' : (1/p).toFixed(2);
   function fmtAm(p){ if(p<=0) return '—'; if(p>=0.5) return '-'+Math.round(p/(1-p)*100); return '+'+Math.round((1-p)/p*100); }
   function ratingOf(id){ return T[id].rating; }
 
@@ -460,7 +467,6 @@
     {k:'mkt',label:'Fair %',tip:'FAIR (reference) probability to WIN THE TOURNAMENT. Derived from the consensus sportsbook market, de-vigged (vig removed) and calibrated by simulation. This is your “true” baseline to compare against Polymarket.'},
     {k:'scn',label:'Scn %',tip:'SCENARIO probability to win the tournament given current real results + your manual group/bracket picks. Updates live as you pick or as matches finish.'},
     {k:'delta',label:'Δ pp',tip:'Scn % minus Fair %, in percentage points. How far your picks / actual results have moved this team away from the market baseline. + = better than baseline.'},
-    {k:'dec',label:'Fair dec',tip:'Fair odds in decimal format = 1 / reference probability. The reference is set by the “Edge vs” selector (market baseline or live scenario).'},
     {k:'pm',label:'Poly %',tip:'Polymarket’s implied probability = its current YES price (e.g. $0.17 → 17%). Editable — type to override; “Live Polymarket” fills it from the exchange. Green border = real fetched price.'},
     {k:'edge',label:'Edge pp',tip:'Reference % minus Polymarket %, in percentage points. Positive = Polymarket is pricing the team BELOW fair value (cheap).'},
     {k:'ev',label:'EV %',tip:'Expected value of BUYING a YES share at the Polymarket price = Reference ÷ Polymarket − 1. +20% means a $1 stake is worth ~$1.20 at fair value. Drives the Signal.'},
@@ -483,7 +489,7 @@
       let sig='hold';
       if(ev>=state.evThresh && ref>0.0005) sig='buy';
       else if(ev<=-state.evThresh) sig='sell';
-      return {i,name:t.name,grp:t.group,ref,mkt,scn,delta:(scn-mkt)*100,dec:fmtDec(ref),
+      return {i,name:t.name,grp:t.group,ref,mkt,scn,delta:(scn-mkt)*100,
         pm:pmv,edge,ev,sig,
         r32:lastStats.r32[i],qf:lastStats.qf[i],sf:lastStats.sf[i],fin:lastStats.finalA[i]};
     });
@@ -514,7 +520,6 @@
         case 'edge': av=a.edge;bv=b.edge;break;
         case 'ev': av=a.ev;bv=b.ev;break;
         case 'sig': {const o={buy:2,hold:1,sell:0}; av=o[a.sig];bv=o[b.sig];break;}
-        case 'dec': av=a.ref;bv=b.ref;break;
         case 'r32': av=a.r32;bv=b.r32;break;
         case 'qf': av=a.qf;bv=b.qf;break;
         case 'sf': av=a.sf;bv=b.sf;break;
@@ -534,7 +539,6 @@
         '<td><b>'+pctF(r.mkt)+'</b></td>'+
         '<td>'+pctF(r.scn)+'</td>'+
         '<td class="'+(r.delta>=0?'pos':'neg')+'">'+(Math.abs(r.delta)<0.005?'·':(r.delta>=0?'+':'')+r.delta.toFixed(2))+'</td>'+
-        '<td class="muted">'+r.dec+'</td>'+
         '<td><input class="pm-input'+(real?' real':'')+'" data-i="'+r.i+'" value="'+r.pm+'"/></td>'+
         '<td class="'+(r.edge>=0?'pos':'neg')+'">'+(r.edge>=0?'+':'')+r.edge.toFixed(2)+'</td>'+
         '<td class="'+(r.ev>=0?'pos':'neg')+'">'+(r.ev>=0?'+':'')+r.ev.toFixed(1)+'</td>'+
@@ -814,24 +818,22 @@
       rows.push({name:m.name,team:'',goals:0,pens:0,price:m.price}); });
     rows.sort((a,b)=> b.goals-a.goals || ((b.price||0)-(a.price||0)) || a.name.localeCompare(b.name));
     document.getElementById('gbHead').innerHTML=
-      '<th>#</th><th style="text-align:left">Player</th><th style="text-align:left">Team</th><th>Goals</th><th>GB %</th><th>Fair dec</th>';
+      '<th>#</th><th style="text-align:left">Player</th><th style="text-align:left">Team</th><th>Goals</th><th>GB %</th>';
     const body=document.getElementById('gbBody'); body.innerHTML='';
-    if(!rows.length){ body.innerHTML='<tr><td colspan="6" class="muted small" style="text-align:left">No goals scored yet and Golden Boot odds not loaded — click “Live Golden Boot”.</td></tr>'; return; }
+    if(!rows.length){ body.innerHTML='<tr><td colspan="5" class="muted small" style="text-align:left">No goals scored yet and Golden Boot odds not loaded — click “Live Golden Boot”.</td></tr>'; return; }
     rows.forEach((r,idx)=>{
       const tid=teamIdFromName(r.team);
       const flag = tid!=null ? flagHTML(T[tid].name) : '';
       const teamNm = tid!=null ? T[tid].name : (r.team||'');
       const goalsCell = r.goals>0 ? ('<b>'+r.goals+'</b>'+(r.pens?' <span class="muted">('+r.pens+'p)</span>':'')) : '<span class="muted">·</span>';
       const gbCell = (r.price!=null) ? (r.price*100).toFixed(1) : '<span class="muted">—</span>';
-      const decCell = (r.price>0) ? (1/r.price).toFixed(1) : '—';
       const tr=document.createElement('tr');
       tr.innerHTML=
         '<td>'+(idx+1)+'</td>'+
         '<td style="text-align:left">'+r.name+'</td>'+
         '<td style="text-align:left"><div class="teamcell">'+flag+(teamNm||'<span class="muted">—</span>')+'</div></td>'+
         '<td>'+goalsCell+'</td>'+
-        '<td>'+gbCell+'</td>'+
-        '<td class="muted">'+decCell+'</td>';
+        '<td>'+gbCell+'</td>';
       body.appendChild(tr);
     });
   }
@@ -923,10 +925,9 @@
   function fmtDay(iso){ try{ return new Date(iso+'T12:00:00Z').toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'}); }catch(e){ return iso; } }
   // ---- model odds for unplayed matches ----
   function pct0(p){ return (p*100).toFixed(0); }
-  function decOdd(p){ return p>0 ? (1/p).toFixed(2) : '—'; }
   function predBar(segs){
     const bar=segs.map(s=>'<i class="seg seg-'+s.k+'" style="width:'+(s.p*100).toFixed(1)+'%"></i>').join('');
-    const labs=segs.map((s,i)=>'<span class="plab'+(i===segs.length-1?' a':'')+'"><span class="dot2" style="background:'+s.c+'"></span><b>'+s.lab+'</b> '+pct0(s.p)+'% · '+decOdd(s.p)+'</span>').join('');
+    const labs=segs.map((s,i)=>'<span class="plab'+(i===segs.length-1?' a':'')+'"><span class="dot2" style="background:'+s.c+'"></span><b>'+s.lab+'</b> '+pct0(s.p)+'%</span>').join('');
     return '<div class="pred"><div class="predbar">'+bar+'</div><div class="predlabs">'+labs+'</div></div>';
   }
   function predictHTML(g){
@@ -967,15 +968,44 @@
     const wrap=document.getElementById('matchesWrap'); if(!wrap) return;
     const games=Object.values(RESULTS.byGame||{});
     if(!games.length){ wrap.innerHTML='<div class="muted small">No fixtures loaded'+(RESULTS.error?(' — '+RESULTS.error):'')+'. Use Refresh, or open the page over http(s) if blocked.</div>'; return; }
-    games.sort((a,b)=> a.dateISO<b.dateISO?-1:(a.dateISO>b.dateISO?1:0));
-    const byRound={}; games.forEach(g=>{ (byRound[g.roundLabel]=byRound[g.roundLabel]||[]).push(g); });
-    let html='';
-    ROUND_WINDOWS.map(w=>w.lab).forEach(lab=>{ const gs=byRound[lab]; if(!gs) return;
-      const doneN=gs.filter(g=>g.completed).length;
-      html+='<h3 style="margin:12px 0 6px;font-size:14px">'+lab+' <span class="muted small">('+doneN+'/'+gs.length+')</span></h3>';
-      let curDay='';
-      gs.forEach(g=>{ const day=g.dateISO.slice(0,10); if(day!==curDay){ curDay=day; html+='<div class="muted small" style="margin:8px 0 3px">'+fmtDay(day)+'</div>'; } html+=matchRowHTML(g); });
+    const byDate=(a,b)=> a.dateISO<b.dateISO?-1:(a.dateISO>b.dateISO?1:0);
+    // bucket group-stage fixtures by their group letter; everything else is knockout
+    const groupBuckets={}; GROUPS.forEach(L=>groupBuckets[L]=[]);
+    const ko=[];
+    games.forEach(g=>{
+      if(g.round==='group'){
+        const id=teamIdFromName(g.home.name); const L=(id!=null)?T[id].group:null;
+        if(L&&groupBuckets[L]) groupBuckets[L].push(g); else ko.push(g);
+      } else ko.push(g);
     });
+    // render a list of fixtures with day separators
+    function fixtureList(gs){
+      let h='',curDay='';
+      gs.forEach(g=>{ const day=g.dateISO.slice(0,10); if(day!==curDay){ curDay=day; h+='<div class="muted small mgday">'+fmtDay(day)+'</div>'; } h+=matchRowHTML(g); });
+      return h;
+    }
+    let html='';
+    // ---- group stage: one card per group, two cards side by side ----
+    if(GROUPS.some(L=>groupBuckets[L].length)){
+      html+='<h3 class="msec">Group stage</h3><div class="mgroups">';
+      GROUPS.forEach(L=>{
+        const gs=groupBuckets[L].slice().sort(byDate); if(!gs.length) return;
+        const doneN=gs.filter(g=>g.completed).length;
+        html+='<div class="mgcard"><h4 class="mgh"><span class="gl">Group '+L+'</span><span class="muted small">'+doneN+'/'+gs.length+'</span></h4>'+fixtureList(gs)+'</div>';
+      });
+      html+='</div>';
+    }
+    // ---- knockout: by round ----
+    ko.sort(byDate);
+    const koByRound={}; ko.forEach(g=>{ (koByRound[g.roundLabel]=koByRound[g.roundLabel]||[]).push(g); });
+    const koRounds=ROUND_WINDOWS.filter(w=>w.ko).map(w=>w.lab);
+    if(koRounds.some(lab=>koByRound[lab])){
+      html+='<h3 class="msec">Knockout stage</h3>';
+      koRounds.forEach(lab=>{ const gs=koByRound[lab]; if(!gs) return;
+        const doneN=gs.filter(g=>g.completed).length;
+        html+='<h4 class="mgh" style="margin-top:10px">'+lab+' <span class="muted small">('+doneN+'/'+gs.length+')</span></h4>'+fixtureList(gs);
+      });
+    }
     wrap.innerHTML=html;
   }
   document.getElementById('refreshResults').onclick=()=>fetchResults(true).then(maybeRecompute);

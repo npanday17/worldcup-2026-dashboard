@@ -10,8 +10,5 @@
     "test": "node verify.js",
     "check": "node verify.js && node assemble.js",
     "deploy": "vercel --prod"
-  },
-  "devDependencies": {
-    "jsdom": "^29.1.1"
   }
 }

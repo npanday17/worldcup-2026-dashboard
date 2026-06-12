@@ -23,7 +23,7 @@ Source of truth:
 ## Build / test / deploy
 
 ```bash
-npm install            # one-time: dev/test deps only
+                       # no npm dependencies — build/test are plain Node, no install needed
 npm run build          # assemble index.html from the sources (fast)
 npm run test           # run the math/logic checks (expect "27 passed, 0 failed")
 npm run rebuild        # re-run calibration THEN assemble (see below for when)

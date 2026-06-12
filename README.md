@@ -12,8 +12,7 @@ A single-page, fully client-side dashboard:
 ## Quick start
 
 ```bash
-npm install                 # dev/test deps only
-npm run build               # generate index.html from the sources
+npm run build               # generate index.html from the sources (no deps to install)
 python3 -m http.server 8000 # then open http://localhost:8000/index.html
 ```
 
