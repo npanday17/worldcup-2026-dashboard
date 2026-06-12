@@ -42,6 +42,14 @@ edits do **not** need recalibration — just `npm run build`.
 To update the `Fair %` baseline odds: edit the `TEAMS` array in `calibrate.js` (the third
 value per row is the American championship price), then `npm run rebuild`.
 
+**Fair-odds model (`calibrate.js`):** championship odds are de-vigged with **Shin's method**
+(`shinDevig`, corrects favourite–longshot bias), not naive proportional. Ratings are then fit
+**multi-market**: the championship anchor dominates (so `Fair %` ≈ the de-vigged book) while
+the Polymarket **reach-R16/QF/SF** snapshot (`PROGRESSION` const) refines ratings where
+champ ≈ 0 gives no signal. To refresh the `PROGRESSION` snapshot, re-fetch
+`gamma-api.polymarket.com/events?slug=world-cup-nation-to-reach-{round-of-16,quarterfinals,semifinals}`
+(mid-price per `groupItemTitle`) and paste the updated values, then `npm run rebuild`.
+
 ## Run locally (do NOT open index.html via file://)
 The page fetches Polymarket, ESPN, and a SQLite CDN, and uses localStorage/IndexedDB — all of
 which are flaky or blocked under `file://`. Serve it:

@@ -109,5 +109,18 @@ ok(mb && mb.team==='France','scorer team derived from match side ('+(mb&&mb.team
 ok(!board.some(r=>r.name==='Own Goalsson'),'own goal excluded from scorer board');
 ok(board.length===2 && board[0].key==='kylianmbappe','board sorted by goals desc, OG-only player dropped ('+board.length+' rows)');
 
+// --- Shin de-vig + multi-market calibration anchoring (data.json artifacts) ---
+const mp=T.map(t=>t.marketProb);
+ok(Math.abs(sum(mp)-1)<1e-3,'Shin-de-vigged championship probs sum to 1 ('+sum(mp).toFixed(4)+')');
+const r16t=T.map(t=>t.mR16), qft=T.map(t=>t.mQF), sft=T.map(t=>t.mSF);
+ok(Math.abs(sum(r16t)-16)<0.2,'R16 progression targets de-vig to 16 slots ('+sum(r16t).toFixed(2)+')');
+ok(Math.abs(sum(qft)-8)<0.2,'QF progression targets de-vig to 8 slots ('+sum(qft).toFixed(2)+')');
+ok(Math.abs(sum(sft)-4)<0.2,'SF progression targets de-vig to 4 slots ('+sum(sft).toFixed(2)+')');
+// the multi-market calibration actually pulled the simulation toward the progression markets
+function mae(model,tgt){let s=0,n=0;for(let i=0;i<N;i++){if(tgt[i]<=1e-4)continue;s+=Math.abs(model[i]-tgt[i]);n++;}return s/n;}
+const stp=eng.run({},80000,29);
+ok(mae(stp.qf,qft)<0.04,'sim QF anchored near progression market (mae='+(mae(stp.qf,qft)*100).toFixed(2)+'pp)');
+ok(mae(stp.sf,sft)<0.04,'sim SF anchored near progression market (mae='+(mae(stp.sf,sft)*100).toFixed(2)+'pp)');
+
 console.log('\n'+pass+' passed, '+fail+' failed.');
 process.exit(fail?1:0);
