@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>World Cup 2026 Odds — Fair Value vs Polymarket</title>
+<meta name="description" content="Interactive 2026 FIFA World Cup dashboard: model-fair championship odds for all 48 teams vs live Polymarket prices, with edge/EV buy–sell signals and a full interactive bracket simulator."/>
+<meta name="theme-color" content="#0c1018"/>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='88'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E"/>
+<meta property="og:type" content="website"/>
+<meta property="og:title" content="World Cup 2026 Odds — Fair Value vs Polymarket"/>
+<meta property="og:description" content="Fair championship odds for all 48 teams vs live Polymarket prices, with edge/EV signals and an interactive bracket simulator."/>
+<meta name="twitter:card" content="summary"/>
+<style>
+  :root{
+    --bg:#0c1018; --panel:#141a26; --panel2:#1b2333; --line:#283449;
+    --txt:#e7ecf3; --mut:#93a1b5; --acc:#4ea1ff; --accd:#2b6fc4;
+    --buy:#16c784; --sell:#f6465d; --hold:#8a97a8; --warn:#ffb547;
+    --chip:#222c3d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--acc)}
+  h1,h2,h3{margin:0;font-weight:650}
+  .wrap{max-width:1320px;margin:0 auto;padding:18px}
+  header.top{display:flex;flex-wrap:wrap;align-items:center;gap:14px;justify-content:space-between;margin-bottom:6px}
+  .title h1{font-size:20px;letter-spacing:.2px}
+  .title p{margin:2px 0 0;color:var(--mut);font-size:12.5px}
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .ctl{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 9px;color:var(--txt);font-size:12.5px}
+  select.ctl,input.ctl{outline:none}
+  button.btn{cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:7px 11px;font-size:12.5px}
+  button.btn:hover{border-color:var(--acc)}
+  button.btn.primary{background:var(--accd);border-color:var(--accd)}
+  button.btn.primary:hover{background:var(--acc)}
+  .tabs{display:flex;gap:6px;margin:14px 0 10px}
+  .tab{cursor:pointer;padding:8px 14px;border-radius:8px 8px 0 0;border:1px solid var(--line);border-bottom:none;background:var(--panel);color:var(--mut);font-weight:600}
+  .tab.active{background:var(--panel2);color:var(--txt)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .muted{color:var(--mut)}
+  .small{font-size:12px}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .status{font-size:12px;color:var(--mut);min-height:16px}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);margin-right:6px;vertical-align:middle}
+  .dot.idle{background:var(--buy)}
+  /* table */
+  table.odds{width:100%;border-collapse:collapse;font-size:12.8px}
+  table.odds th,table.odds td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  table.odds th:nth-child(2),table.odds td:nth-child(2){text-align:left}
+  table.odds th{position:sticky;top:0;background:var(--panel);cursor:pointer;color:var(--mut);font-weight:600;user-select:none}
+  table.odds th.sorted{color:var(--txt)}
+  table.odds th.hastip{text-decoration:underline dotted rgba(147,161,181,.55);text-underline-offset:3px}
+  .btn[title],.ctl[title]{position:relative}
+  table.odds tbody tr:hover{background:#172033}
+  .teamcell{display:flex;align-items:center;gap:7px}
+  .flag{width:21px;height:15px;border-radius:2px;vertical-align:middle;box-shadow:0 0 0 1px rgba(0,0,0,.35);object-fit:cover;flex:0 0 auto}
+  .flag-emoji{font-size:15px;vertical-align:middle;line-height:1}
+  .trow .flag,.slot .flag{width:18px;height:13px;margin-right:4px}
+  .trow .flag-emoji,.slot .flag-emoji{margin-right:4px;font-size:13px}
+  .grp{display:inline-block;min-width:18px;text-align:center;background:var(--chip);border-radius:5px;padding:1px 5px;font-size:11px;color:var(--mut)}
+  .pm-input{width:62px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:4px 6px;text-align:right;font-size:12.5px}
+  .pm-input.real{border-color:#2f5d49}
+  .sig{font-weight:700;border-radius:6px;padding:2px 7px;font-size:11.5px}
+  .sig.buy{background:rgba(22,199,132,.14);color:var(--buy)}
+  .sig.sell{background:rgba(246,70,93,.14);color:var(--sell)}
+  .sig.hold{background:rgba(138,151,168,.14);color:var(--hold)}
+  .pos{color:var(--buy)} .neg{color:var(--sell)}
+  .bar{height:6px;border-radius:4px;background:var(--panel2);overflow:hidden;min-width:46px}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,#2b6fc4,#4ea1ff)}
+  /* groups */
+  .groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
+  .gcard{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px}
+  .gcard h3{font-size:13px;display:flex;justify-content:space-between;align-items:center}
+  .gcard h3 .gl{background:var(--accd);border-radius:6px;padding:1px 8px;font-size:12px}
+  .trow{display:flex;align-items:center;gap:6px;padding:5px 2px;border-bottom:1px dashed #222c3d}
+  .trow:last-child{border-bottom:none}
+  .trow .nm{flex:1;font-size:12.6px;overflow:hidden;text-overflow:ellipsis}
+  .trow .pct{font-size:11px;color:var(--mut);width:54px;text-align:right}
+  .pbtn{cursor:pointer;width:22px;height:22px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--mut);font-size:11px;font-weight:700;line-height:20px;text-align:center}
+  .pbtn.on1{background:#caa53a;color:#1a1300;border-color:#caa53a}
+  .pbtn.on2{background:#9aa7b8;color:#10141b;border-color:#9aa7b8}
+  .pbtn.on3{background:#7a5230;color:#fff;border-color:#7a5230}
+  .thirdchk{display:flex;align-items:center;gap:6px;margin-top:7px;font-size:11.5px;color:var(--mut)}
+  /* bracket */
+  .bracket{display:flex;gap:18px;overflow-x:auto;padding-bottom:8px}
+  .bcol{display:flex;flex-direction:column;gap:8px;min-width:178px}
+  .bcol h4{font-size:11.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;margin-bottom:2px}
+  .match{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px;font-size:11.7px}
+  .slot{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:4px 6px;border-radius:6px;cursor:default}
+  .slot.click{cursor:pointer}
+  .slot.click:hover{background:#1d283b}
+  .slot.win{background:rgba(78,161,255,.16)}
+  .slot .sn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .slot .sp{color:var(--mut);font-size:10.5px;margin-left:4px}
+  .slot.tbd .sn{color:var(--mut);font-style:italic}
+  .mlabel{font-size:10px;color:#5e6c82;padding:1px 6px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--mut);font-size:11.5px;margin-top:8px}
+  details.help{margin-top:12px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 12px}
+  details.help summary{cursor:pointer;color:var(--acc);font-weight:600}
+  details.help p{color:var(--mut);font-size:12.5px}
+  code{background:#0e1420;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+  .hide{display:none}
+  .flex1{flex:1}
+  .right{margin-left:auto}
+  #scenarioBar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:2px 0 6px}
+  #dbBar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
+  #scenarioBar .vsep{width:1px;height:18px;background:var(--line);margin:0 2px}
+  #scenName{padding:5px 8px}
+  #scenList{max-width:200px}
+  .matchrow{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:6px}
+  .matchrow.live{border-color:var(--warn)}
+  .mteams{display:grid;grid-template-columns:1fr 64px 1fr;align-items:center;gap:8px}
+  .mt{display:flex;align-items:center;gap:7px;min-width:0}
+  .mt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mt.away{justify-content:flex-end;text-align:right}
+  .msc{text-align:center;font-weight:700;font-size:15px}
+  .mmeta{margin-top:2px}
+  .mmeta.mlive{color:var(--warn);font-weight:600}
+  .scorers{margin-top:3px}
+  @media (max-width:640px){ .title p{display:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="title">
+      <h1>⚽ World Cup 2026 — Fair Odds vs Polymarket</h1>
+      <p>Reference odds from de-vigged sportsbook market • compare to Polymarket • interactive bracket • <span id="genstamp"></span></p>
+    </div>
+    <div class="controls">
+      <label class="ctl" title="Number of Monte Carlo tournament simulations run on every update. More = smoother, more precise odds but slightly slower.">Sims
+        <select class="ctl" id="simSel" style="margin-left:6px;padding:2px">
+          <option value="4000">4k (fast)</option>
+          <option value="8000" selected>8k</option>
+          <option value="16000">16k</option>
+          <option value="30000">30k (precise)</option>
+        </select>
+      </label>
+      <label class="ctl" title="Which probability the Edge / EV / Signal columns compare against Polymarket: the static market baseline (Fair %) or your live scenario (Scn %).">Edge vs
+        <select class="ctl" id="refSel" style="margin-left:6px;padding:2px">
+          <option value="market" selected>Market baseline (Fair %)</option>
+          <option value="live">Scenario (results + picks)</option>
+        </select>
+      </label>
+      <label class="ctl" title="Minimum absolute EV% needed to flag BUY or SELL instead of HOLD. Higher = only stronger edges are flagged.">EV thresh
+        <input class="ctl pm-input" id="evThresh" value="8" style="width:46px;margin-left:6px"/> %
+      </label>
+      <button class="btn" id="autofill" title="“Chalk” = betting slang for the favorites. Fills every group 1/2/3 and the 8 best third-placed teams strictly by model strength (the higher-rated team always wins), producing a no-upsets favorites bracket you can then tweak.">Auto-fill chalk</button>
+      <button class="btn" id="reset" title="Clear all your manual group and knockout picks. Live match results stay applied.">Reset</button>
+      <label class="ctl" title="Automatically fetch live Polymarket prices when the page opens"><input type="checkbox" id="autoPM" checked style="vertical-align:middle"/> auto</label>
+      <button class="btn primary" id="fetchPM">⤓ Live Polymarket</button>
+    </div>
+  </header>
+  <div class="small muted" id="pmStamp" style="margin:-2px 0 4px">Polymarket: using prefilled snapshot — click “Live Polymarket” to pull current prices.</div>
+  <div class="small" id="scenarioBar">
+    <b class="muted">💾 Scenarios:</b>
+    <input class="ctl" id="scenName" placeholder="name this simulation" style="width:170px"/>
+    <button class="btn" id="scenSave">Save</button>
+    <select class="ctl" id="scenList"><option value="">— load saved —</option></select>
+    <button class="btn" id="scenDelete">Delete</button>
+    <span class="vsep"></span>
+    <button class="btn" id="scenExport">⤓ Export .json</button>
+    <button class="btn" id="scenImport">⤒ Import</button>
+    <input type="file" id="scenFile" accept="application/json,.json" class="hide"/>
+    <span class="muted" id="scenMsg"></span>
+  </div>
+  <div class="small" id="dbBar">
+    <b class="muted">🗄 SQLite DB:</b>
+    <button class="btn" id="dbSnap">Snapshot odds → DB</button>
+    <button class="btn" id="dbSaveScn">Save scenario → DB</button>
+    <button class="btn" id="dbExport">⤓ Export .sqlite</button>
+    <button class="btn" id="dbImport">⤒ Import .sqlite</button>
+    <input type="file" id="dbFile" accept=".sqlite,.db,application/octet-stream" class="hide"/>
+    <span class="muted" id="dbMsg">engine loads on first use</span>
+  </div>
+
+  <div class="status"><span class="dot idle" id="statusDot"></span><span id="statusText">Ready.</span></div>
+  <div class="small" id="resultsBanner" style="margin:2px 0 4px;color:var(--mut)">📡 Live results: not loaded yet.</div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="odds">Odds & Edge</div>
+    <div class="tab" data-tab="groups">Group Stage</div>
+    <div class="tab" data-tab="bracket">Knockout Bracket</div>
+    <div class="tab" data-tab="matches">Matches & Scorers</div>
+  </div>
+
+  <!-- ODDS TAB -->
+  <section id="tab-odds" class="panel">
+    <div class="row" style="align-items:center;margin-bottom:8px">
+      <div class="small muted flex1">Reference = model fair probability (calibrated to de-vigged book market). <b>BUY</b> = Polymarket underpricing vs fair (positive EV to buy). <b>SELL</b> = overpriced. Edit any Polymarket cell to use live prices. Progression columns react to your bracket picks.</div>
+    </div>
+    <div style="overflow:auto;max-height:70vh">
+      <table class="odds" id="oddsTable">
+        <thead><tr id="oddsHead"></tr></thead>
+        <tbody id="oddsBody"></tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span><span class="sig buy">BUY</span> fair &gt; PM by ≥ EV thresh</span>
+      <span><span class="sig sell">SELL</span> fair &lt; PM by ≥ EV thresh</span>
+      <span><span class="sig hold">HOLD</span> within threshold</span>
+      <span>PM cells with green border = real Polymarket snapshot; others estimated — overwrite with live values.</span>
+    </div>
+  </section>
+
+  <!-- GROUPS TAB -->
+  <section id="tab-groups" class="panel hide">
+    <div class="small muted" style="margin-bottom:10px">Click <b>1 / 2 / 3</b> to set a team's finishing position (winner / runner-up / third). Set <b>both 1st &amp; 2nd</b> to lock a group into the bracket. Check “3rd advances” for up to 8 groups to send their third-placed team to the Round of 32 (FIFA takes the best 8). Unset groups are simulated.</div>
+    <div class="small muted" id="thirdCounter" style="margin-bottom:10px"></div>
+    <div class="groups" id="groupsWrap"></div>
+  </section>
+
+  <!-- BRACKET TAB -->
+  <section id="tab-bracket" class="panel hide">
+    <div class="small muted" style="margin-bottom:10px">Slots fill once group positions are set (and 8 thirds chosen). Click a team in a decided match to advance it; click again to undo. The % on each decided match is that team’s single-match win probability from the model.</div>
+    <div class="bracket" id="bracketWrap"></div>
+  </section>
+
+  <!-- MATCHES TAB -->
+  <section id="tab-matches" class="panel hide">
+    <div class="row" style="align-items:center;margin-bottom:8px">
+      <div class="small muted flex1">Live scores &amp; goal scorers from ESPN. Completed matches automatically condition the fair odds (group standings use real goal difference; knockout winners lock the bracket). <b>In-progress</b> matches are not yet applied until final.</div>
+      <button class="btn" id="refreshResults">↻ Refresh</button>
+    </div>
+    <div id="matchesWrap"></div>
+  </section>
+
+  <details class="help">
+    <summary>Methodology, signals & disclaimer</summary>
+    <p><b>Reference (fair) odds.</b> Each team's championship probability is derived from the consensus sportsbook outright market (DraftKings board via ESPN, Apr 2026), converted from American odds to implied probability and <i>de-vigged</i> (normalised to sum to 100%, removing the ~18% bookmaker overround). Team strength ratings were then calibrated by Monte Carlo so the simulated tournament reproduces those championship probabilities (within ~0.4pp). This is your “market-implied baseline.”</p>
+    <p><b>Simulation.</b> Group matches use a Davidson win/draw/loss model; knockout matches a Bradley–Terry win model, over the exact official 2026 bracket including the 8-best-third-place routing (all 495 FIFA Annex C combinations embedded). Locking outcomes conditions the remaining simulation, so championship and round-by-round odds update live.</p>
+    <p><b>Edge & signals.</b> Edge (pp) = Reference% − Polymarket%. EV% = Reference / Polymarket − 1 (expected value of buying a YES share at the Polymarket price). BUY when EV ≥ threshold (Polymarket too cheap vs fair), SELL when EV ≤ −threshold. Switch “Edge vs” to <i>Live model</i> to price your specific bracket scenario instead of the static baseline.</p>
+    <p><b>Disclaimer.</b> This is an analytical tool, not financial advice. “Fair” odds are only as good as the inputs; prediction-market prices can be right and the book consensus wrong. Markets move — refresh the Polymarket cells with live values before acting, and manage risk yourself.</p>
+  </details>
+</div>
+
+<script>/*__ENGINE__*/</script>
+<script>const DATA = /*__DATA__*/;</script>
+<script>
+/* ============================ APP ============================ */
+(function(){
+  const T = DATA.teams;
+  const N = T.length;
+  const GROUPS = DATA.groupsOrder;
+  const members = DATA.groupMembers;
+  const eng = WCEngine.Engine({
+    teams:T.map(t=>t.name), groupsOrder:GROUPS, groupMembers:members,
+    ratings:T.map(t=>t.rating), nu:DATA.nu, annex:DATA.annex
+  });
+  document.getElementById('genstamp').textContent = 'data '+(DATA.generated||'').slice(0,10);
+
+  /* ---- flags ---- */
+  const ISO={
+    'Mexico':'mx','South Africa':'za','South Korea':'kr','Czechia':'cz',
+    'Canada':'ca','Bosnia & Herzegovina':'ba','Qatar':'qa','Switzerland':'ch',
+    'Brazil':'br','Morocco':'ma','Haiti':'ht','Scotland':'gb-sct',
+    'United States':'us','Paraguay':'py','Australia':'au','Turkey':'tr',
+    'Germany':'de','Curacao':'cw','Ivory Coast':'ci','Ecuador':'ec',
+    'Netherlands':'nl','Japan':'jp','Sweden':'se','Tunisia':'tn',
+    'Belgium':'be','Egypt':'eg','Iran':'ir','New Zealand':'nz',
+    'Spain':'es','Cape Verde':'cv','Saudi Arabia':'sa','Uruguay':'uy',
+    'France':'fr','Senegal':'sn','Iraq':'iq','Norway':'no',
+    'Argentina':'ar','Algeria':'dz','Austria':'at','Jordan':'jo',
+    'Portugal':'pt','DR Congo':'cd','Uzbekistan':'uz','Colombia':'co',
+    'England':'gb-eng','Croatia':'hr','Ghana':'gh','Panama':'pa'
+  };
+  function flagEmoji(name){
+    const c=ISO[name]||'';
+    if(c==='gb-eng') return '🏴\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}';
+    if(c==='gb-sct') return '🏴\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}';
+    const cc=c.slice(0,2).toUpperCase();
+    if(cc.length!==2) return '🏳️';
+    return String.fromCodePoint(0x1F1E6+cc.charCodeAt(0)-65, 0x1F1E6+cc.charCodeAt(1)-65);
+  }
+  window.flagFallback=function(img,em){ var s=document.createElement('span'); s.className='flag-emoji'; s.textContent=em; if(img&&img.parentNode) img.replaceWith(s); };
+  function flagHTML(name){
+    const c=ISO[name]; if(!c) return '';
+    const em=flagEmoji(name);
+    return '<img class="flag" src="https://flagcdn.com/24x18/'+c+'.png" srcset="https://flagcdn.com/48x36/'+c+'.png 2x" width="21" height="15" alt="" loading="lazy" onerror="flagFallback(this,\''+em+'\')"/>';
+  }
+
+  // ---- state ----
+  const state = {
+    groupPos:{},          // L -> {1:id,2:id,3:id}
+    thirdAdvance:{},      // L -> bool
+    koWin:{},             // matchNo -> id
+    sims:8000, ref:'market', evThresh:8,
+    sortKey:'mkt', sortDir:-1
+  };
+  GROUPS.forEach(L=>{ state.groupPos[L]={}; state.thirdAdvance[L]=false; });
+
+  let lastStats = DATA.defaultStats; // seeded snapshot until first run
+
+  // ---- helpers ----
+  const pctF = x => (x*100).toFixed(2);
+  const fmtDec = p => p<=0 ? '—' : (1/p).toFixed(2);
+  function fmtAm(p){ if(p<=0) return '—'; if(p>=0.5) return '-'+Math.round(p/(1-p)*100); return '+'+Math.round((1-p)/p*100); }
+  function ratingOf(id){ return T[id].rating; }
+
+  // Build fixes object for engine = live results conditioning + your manual picks
+  function buildFixes(){
+    const eff=computeEffective();
+    return { groupGoals:eff.groupGoals, groupOrder:eff.groupOrder, thirdIn:eff.thirdIn, thirdOut:[], koWin:eff.koWin };
+  }
+
+  function teamIdFromName(nm){ const c=canon(nm); return CANON2ID[c]; }
+
+  // standings for a group from a list of played matches [{a,b,ga,gb}] (local indices a<b)
+  function groupStandings(L, goals){
+    const m=members[L];
+    const st=m.map((id,li)=>({id,li,pts:0,gf:0,ga:0}));
+    (goals||[]).forEach(r=>{
+      const A=st[r.a],B=st[r.b];
+      A.gf+=r.ga;A.ga+=r.gb;B.gf+=r.gb;B.ga+=r.ga;
+      if(r.ga>r.gb)A.pts+=3; else if(r.ga<r.gb)B.pts+=3; else {A.pts++;B.pts++;}
+    });
+    st.forEach(s=>s.gd=s.gf-s.ga);
+    st.sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf || (T[y.id].rating-T[x.id].rating) || (x.id-y.id));
+    return st;
+  }
+
+  // Merge live results with manual picks into one effective tournament state.
+  function computeEffective(){
+    const eff={groupGoals:{},groupOrder:{},groupComplete:{},standings:{},realGoals:{},playedCount:{},
+      thirdIn:[],thirdSlot:{},participants:{},winners:{},realKoWin:{},koWin:{},
+      completed:0,live:0,allComplete:false};
+    const games=Object.values((RESULTS&&RESULTS.byGame)||{});
+    // ---- real played group matches (for points display + conditioning when unset) ----
+    GROUPS.forEach(L=>eff.realGoals[L]=[]);
+    games.forEach(g=>{
+      if(g.state==='in') eff.live++;
+      if(g.completed) eff.completed++;
+      if(g.round!=='group'||!g.completed) return;
+      const ha=teamIdFromName(g.home.name), aw=teamIdFromName(g.away.name);
+      if(ha===undefined||aw===undefined) return;
+      const L=T[ha].group; if(T[aw].group!==L) return;
+      const la=members[L].indexOf(ha), lb=members[L].indexOf(aw);
+      const a=Math.min(la,lb), b=Math.max(la,lb);
+      const ga = (a===la)? g.home.score : g.away.score;
+      const gb = (a===la)? g.away.score : g.home.score;
+      eff.realGoals[L].push({a,b,ga,gb});
+    });
+    GROUPS.forEach(L=>{
+      const goals=eff.realGoals[L];
+      eff.playedCount[L]=goals.length;
+      eff.groupComplete[L]= goals.length>=6;
+      eff.standings[L]=groupStandings(L, goals);
+      const gp=state.groupPos[L];
+      const userSet = gp[1]!=null && gp[2]!=null;
+      if(userSet){
+        // your manual pick always governs (scenario) — even mid-group
+        const rest=members[L].filter(id=>id!==gp[1]&&id!==gp[2]);
+        let third=gp[3]; if(third==null) third=rest.slice().sort((a,b)=>ratingOf(b)-ratingOf(a))[0];
+        const fourth=rest.find(id=>id!==third);
+        eff.groupOrder[L]=[gp[1],gp[2],third,fourth];
+        eff.groupGoals[L]=[];
+      } else if(eff.groupComplete[L]){
+        // finished group with no manual pick → default to real result (still editable)
+        eff.groupOrder[L]=eff.standings[L].map(s=>s.id);
+        eff.groupGoals[L]=goals;
+      } else {
+        // partial/no pick → condition the simulation on played matches
+        eff.groupGoals[L]=goals;
+      }
+    });
+    eff.allComplete=GROUPS.every(L=>eff.groupComplete[L]);
+    // ---- thirds ----
+    if(eff.allComplete){
+      const thirds=GROUPS.map(L=>{ const s=eff.standings[L][2]; return {L,id:s.id,pts:s.pts,gd:s.gd,gf:s.gf}; });
+      thirds.sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf || (T[y.id].rating-T[x.id].rating));
+      eff.thirdIn=thirds.slice(0,8).map(o=>o.L);
+    } else {
+      eff.thirdIn=GROUPS.filter(L=>state.thirdAdvance[L]);
+    }
+    // ---- third-place routing (only if 8 thirds with known order) ----
+    if(eff.thirdIn.length===8 && eff.thirdIn.every(L=>eff.groupOrder[L])){
+      const key=eff.thirdIn.slice().sort().join('');
+      const routing=DATA.annex[key];
+      if(routing){ const SLOT=eng.THIRD_SLOT_LETTERS, M=eng.THIRD_SLOT_MATCH;
+        for(let s=0;s<8;s++){ const tg=routing[s]; eff.thirdSlot[M[SLOT[s]]] = eff.groupOrder[tg]? eff.groupOrder[tg][2]:null; } }
+    }
+    // ---- knockout walk: real results take precedence, then your picks ----
+    const koGames=games.filter(g=>g.round!=='group' && g.completed);
+    function slotTeam(slot){
+      switch(slot.k){
+        case 'W': return eff.groupOrder[slot.g]? eff.groupOrder[slot.g][0]:null;
+        case 'R': return eff.groupOrder[slot.g]? eff.groupOrder[slot.g][1]:null;
+        case 'T': { const v=eff.thirdSlot[eng.THIRD_SLOT_MATCH[slot.g]]; return v===undefined?null:v; }
+        case 'M': return eff.winners[slot.m]!==undefined?eff.winners[slot.m]:null;
+      }
+    }
+    eng.KO_ORDER.forEach(m=>{
+      const spec=eng.R32[m]||eng.LATER[m];
+      const a=slotTeam(spec[0]), b=slotTeam(spec[1]);
+      eff.participants[m]={a,b};
+      let w;
+      if(a!=null && b!=null){
+        const g=koGames.find(g=>{const x=teamIdFromName(g.home.name),y=teamIdFromName(g.away.name); return (x===a&&y===b)||(x===b&&y===a);});
+        if(g){ let wid=(g.winnerId!=null)?g.winnerId:(g.home.score>g.away.score?teamIdFromName(g.home.name):(g.away.score>g.home.score?teamIdFromName(g.away.name):null));
+          if(wid!=null){ w=wid; eff.realKoWin[m]=wid; } }
+        if(w===undefined && state.koWin[m]!=null && (state.koWin[m]===a||state.koWin[m]===b)) w=state.koWin[m];
+      }
+      if(w!==undefined) eff.winners[m]=w;
+    });
+    eff.koWin=Object.assign({}, state.koWin, eff.realKoWin);
+    return eff;
+  }
+
+  // ---- compute (Monte Carlo) ----
+  let computeTimer=null, computing=false, seedCtr=1;
+  function scheduleCompute(){
+    if(computeTimer) clearTimeout(computeTimer);
+    setStatus(true,'Computing '+state.sims.toLocaleString()+' simulations…');
+    computeTimer=setTimeout(runCompute, 60);
+  }
+  function runCompute(){
+    computing=true;
+    const fixes=buildFixes();
+    const t0=performance.now();
+    lastStats = eng.run(fixes, state.sims, (seedCtr++*2654435761)>>>0);
+    const dt=Math.round(performance.now()-t0);
+    computing=false;
+    renderAll();
+    setStatus(false,'Updated • '+state.sims.toLocaleString()+' sims in '+dt+' ms.');
+    if(typeof saveLast==='function') saveLast();
+  }
+  function setStatus(busy,txt){
+    document.getElementById('statusDot').className='dot'+(busy?'':' idle');
+    document.getElementById('statusText').textContent=txt;
+  }
+
+  /* ---------------- ODDS TABLE ---------------- */
+  const COLS=[
+    {k:'rank',label:'#',tip:'Row rank in the currently sorted column (default: Fair %). Click any header to sort.'},
+    {k:'name',label:'Team',tip:'National team. Click a header to re-sort the table.'},
+    {k:'grp',label:'Grp',tip:'Group (A–L) the team was drawn into.'},
+    {k:'mkt',label:'Fair %',tip:'FAIR (reference) probability to WIN THE TOURNAMENT. Derived from the consensus sportsbook market, de-vigged (vig removed) and calibrated by simulation. This is your “true” baseline to compare against Polymarket.'},
+    {k:'scn',label:'Scn %',tip:'SCENARIO probability to win the tournament given current real results + your manual group/bracket picks. Updates live as you pick or as matches finish.'},
+    {k:'delta',label:'Δ pp',tip:'Scn % minus Fair %, in percentage points. How far your picks / actual results have moved this team away from the market baseline. + = better than baseline.'},
+    {k:'dec',label:'Fair dec',tip:'Fair odds in decimal format = 1 / reference probability. The reference is set by the “Edge vs” selector (market baseline or live scenario).'},
+    {k:'pm',label:'Poly %',tip:'Polymarket’s implied probability = its current YES price (e.g. $0.17 → 17%). Editable — type to override; “Live Polymarket” fills it from the exchange. Green border = real fetched price.'},
+    {k:'edge',label:'Edge pp',tip:'Reference % minus Polymarket %, in percentage points. Positive = Polymarket is pricing the team BELOW fair value (cheap).'},
+    {k:'ev',label:'EV %',tip:'Expected value of BUYING a YES share at the Polymarket price = Reference ÷ Polymarket − 1. +20% means a $1 stake is worth ~$1.20 at fair value. Drives the Signal.'},
+    {k:'sig',label:'Signal',tip:'BUY when EV ≥ your threshold (Polymarket underpricing vs fair), SELL when EV ≤ −threshold (overpriced), otherwise HOLD. Set the threshold in the “EV thresh” box.'},
+    {k:'r32',label:'R32 %',tip:'Probability the team reaches the Round of 32 (i.e. survives the group stage). From the live simulation.'},
+    {k:'qf',label:'QF %',tip:'Probability the team reaches the quarter-finals.'},
+    {k:'sf',label:'SF %',tip:'Probability the team reaches the semi-finals.'},
+    {k:'fin',label:'Final %',tip:'Probability the team reaches the final.'},
+  ];
+  function refProb(i){ return state.ref==='market'? T[i].marketProb : lastStats.champ[i]; }
+  function rowData(){
+    const pm = window.__pm || (window.__pm = T.map(t=>t.pmPrefill));
+    return T.map((t,i)=>{
+      const ref=refProb(i);
+      const mkt=t.marketProb, scn=lastStats.champ[i];
+      const pmv=pm[i];
+      const pmp=pmv/100;
+      const edge=(ref*100)-pmv;
+      const ev = pmp>0 ? (ref/pmp-1)*100 : 0;
+      let sig='hold';
+      if(ev>=state.evThresh && ref>0.0005) sig='buy';
+      else if(ev<=-state.evThresh) sig='sell';
+      return {i,name:t.name,grp:t.group,ref,mkt,scn,delta:(scn-mkt)*100,dec:fmtDec(ref),
+        pm:pmv,edge,ev,sig,
+        r32:lastStats.r32[i],qf:lastStats.qf[i],sf:lastStats.sf[i],fin:lastStats.finalA[i]};
+    });
+  }
+  function renderHead(){
+    const tr=document.getElementById('oddsHead'); tr.innerHTML='';
+    COLS.forEach(c=>{
+      const th=document.createElement('th');
+      th.textContent=c.label;
+      let cls=''; if(c.k===state.sortKey) cls='sorted'; if(c.tip){ th.title=c.tip; cls+=(cls?' ':'')+'hastip'; }
+      if(cls) th.className=cls;
+      th.onclick=()=>{ if(state.sortKey===c.k) state.sortDir*=-1; else {state.sortKey=c.k;state.sortDir=(c.k==='name'||c.k==='grp')?1:-1;} renderTable(); };
+      tr.appendChild(th);
+    });
+  }
+  function renderTable(){
+    const rows=rowData();
+    const sk=state.sortKey, dir=state.sortDir;
+    rows.sort((a,b)=>{
+      let av,bv;
+      switch(sk){
+        case 'name': av=a.name; bv=b.name; return dir*av.localeCompare(bv);
+        case 'grp': av=a.grp; bv=b.grp; return dir*(av<bv?-1:av>bv?1:0);
+        case 'rank': case 'mkt': av=a.mkt;bv=b.mkt;break;
+        case 'scn': av=a.scn;bv=b.scn;break;
+        case 'delta': av=a.delta;bv=b.delta;break;
+        case 'pm': av=a.pm;bv=b.pm;break;
+        case 'edge': av=a.edge;bv=b.edge;break;
+        case 'ev': av=a.ev;bv=b.ev;break;
+        case 'sig': {const o={buy:2,hold:1,sell:0}; av=o[a.sig];bv=o[b.sig];break;}
+        case 'dec': av=a.ref;bv=b.ref;break;
+        case 'r32': av=a.r32;bv=b.r32;break;
+        case 'qf': av=a.qf;bv=b.qf;break;
+        case 'sf': av=a.sf;bv=b.sf;break;
+        case 'fin': av=a.fin;bv=b.fin;break;
+        default: av=a.ref;bv=b.ref;
+      }
+      return dir*(av-bv);
+    });
+    const body=document.getElementById('oddsBody'); body.innerHTML='';
+    rows.forEach((r,idx)=>{
+      const tr=document.createElement('tr');
+      const real=T[r.i].pmIsReal;
+      tr.innerHTML=
+        '<td>'+(idx+1)+'</td>'+
+        '<td><div class="teamcell">'+flagHTML(r.name)+'<span class="grp">'+r.grp+'</span>'+r.name+'</div></td>'+
+        '<td class="muted">'+r.grp+'</td>'+
+        '<td><b>'+pctF(r.mkt)+'</b></td>'+
+        '<td>'+pctF(r.scn)+'</td>'+
+        '<td class="'+(r.delta>=0?'pos':'neg')+'">'+(Math.abs(r.delta)<0.005?'·':(r.delta>=0?'+':'')+r.delta.toFixed(2))+'</td>'+
+        '<td class="muted">'+r.dec+'</td>'+
+        '<td><input class="pm-input'+(real?' real':'')+'" data-i="'+r.i+'" value="'+r.pm+'"/></td>'+
+        '<td class="'+(r.edge>=0?'pos':'neg')+'">'+(r.edge>=0?'+':'')+r.edge.toFixed(2)+'</td>'+
+        '<td class="'+(r.ev>=0?'pos':'neg')+'">'+(r.ev>=0?'+':'')+r.ev.toFixed(1)+'</td>'+
+        '<td><span class="sig '+r.sig+'">'+r.sig.toUpperCase()+'</span></td>'+
+        '<td class="muted">'+pctF(r.r32)+'</td>'+
+        '<td class="muted">'+pctF(r.qf)+'</td>'+
+        '<td class="muted">'+pctF(r.sf)+'</td>'+
+        '<td class="muted">'+pctF(r.fin)+'</td>';
+      body.appendChild(tr);
+    });
+    body.querySelectorAll('input.pm-input').forEach(inp=>{
+      inp.addEventListener('change',e=>{
+        const i=+e.target.dataset.i; let v=parseFloat(e.target.value);
+        if(isNaN(v)||v<0) v=0; if(v>100) v=100;
+        window.__pm[i]=v; renderTable(); if(typeof saveLast==='function') saveLast();
+      });
+    });
+  }
+
+  /* ---------------- GROUP CARDS ---------------- */
+  function renderGroups(){
+    const eff=computeEffective();
+    const wrap=document.getElementById('groupsWrap'); wrap.innerHTML='';
+    GROUPS.forEach(L=>{
+      const card=document.createElement('div'); card.className='gcard';
+      const gp=state.groupPos[L];
+      const played=eff.playedCount[L]>0;
+      const userSet = gp[1]!=null && gp[2]!=null;
+      // highlight = your picks; if untouched & finished, show the real result (still editable)
+      const sel={};
+      if(gp[1]!=null) sel[1]=gp[1]; if(gp[2]!=null) sel[2]=gp[2]; if(gp[3]!=null) sel[3]=gp[3];
+      if(!userSet && eff.groupComplete[L]){ const o=eff.groupOrder[L]; sel[1]=o[0]; sel[2]=o[1]; sel[3]=o[2]; }
+      const ptsMap={}; eff.standings[L].forEach(s=>ptsMap[s.id]=s);
+      let html='<h3><span class="gl">Group '+L+'</span><span class="muted small">'+
+        (played?(eff.groupComplete[L]?'● final · pts/adv':'● live · pts/adv'):'adv % / win %')+'</span></h3>';
+      members[L].forEach(id=>{
+        const adv=lastStats.r32[id], wg=lastStats.wingroup[id];
+        let p=0; if(sel[1]===id)p=1; else if(sel[2]===id)p=2; else if(sel[3]===id)p=3;
+        const s=ptsMap[id];
+        const right = played ? (s.pts+'pt '+(s.gd>=0?'+':'')+s.gd+' · '+(adv*100).toFixed(0)+'%')
+                             : ((adv*100).toFixed(0)+'% / '+(wg*100).toFixed(0)+'%');
+        html+='<div class="trow" data-id="'+id+'">'+
+          '<span class="pbtn '+(p===1?'on1':'')+'" data-pos="1">1</span>'+
+          '<span class="pbtn '+(p===2?'on2':'')+'" data-pos="2">2</span>'+
+          '<span class="pbtn '+(p===3?'on3':'')+'" data-pos="3">3</span>'+
+          flagHTML(T[id].name)+'<span class="nm">'+T[id].name+'</span>'+
+          '<span class="pct">'+right+'</span>'+
+          '</div>';
+      });
+      html+='<label class="thirdchk"><input type="checkbox" '+(state.thirdAdvance[L]?'checked':'')+' data-third="'+L+'"/> 3rd place advances to R32</label>';
+      card.innerHTML=html; wrap.appendChild(card);
+    });
+    const n=GROUPS.filter(L=>state.thirdAdvance[L]).length;
+    const tc=document.getElementById('thirdCounter');
+    if(eff.allComplete) tc.innerHTML='All groups complete — 8 best third-placed teams (by results): <b>'+eff.thirdIn.slice().sort().join(', ')+'</b>';
+    else tc.innerHTML='Thirds marked to advance: <b>'+n+'</b> / 8 '+(n===8?'✓':'(or leave the rest to simulation)');
+    wrap.querySelectorAll('.pbtn[data-pos]').forEach(btn=>{
+      btn.onclick=()=>{
+        const row=btn.closest('.trow'); const id=+row.dataset.id; const pos=+btn.dataset.pos; const L=T[id].group;
+        const gp=state.groupPos[L];
+        if(gp[pos]===id){ delete gp[pos]; } else { [1,2,3].forEach(p=>{ if(gp[p]===id) delete gp[p]; }); gp[pos]=id; }
+        markDirty();
+      };
+    });
+    wrap.querySelectorAll('input[data-third]').forEach(chk=>{
+      chk.onchange=()=>{ state.thirdAdvance[chk.dataset.third]=chk.checked; markDirty(); };
+    });
+  }
+
+  /* ---------------- BRACKET ---------------- */
+  const ROUNDS=[
+    {label:'Round of 32',ms:[73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88]},
+    {label:'Round of 16',ms:[89,90,91,92,93,94,95,96]},
+    {label:'Quarter-finals',ms:[97,98,99,100]},
+    {label:'Semi-finals',ms:[101,102]},
+    {label:'Final',ms:[104]},
+  ];
+  function slotLabel(slot){
+    switch(slot.k){
+      case 'W': return '1'+slot.g;
+      case 'R': return 'RU '+slot.g;
+      case 'T': return '3rd→'+slot.g;
+      case 'M': return 'W'+slot.m;
+    }
+  }
+  function renderBracket(){
+    const eff=computeEffective();
+    const wrap=document.getElementById('bracketWrap'); wrap.innerHTML='';
+    ROUNDS.forEach(rd=>{
+      const col=document.createElement('div'); col.className='bcol';
+      col.innerHTML='<h4>'+rd.label+'</h4>';
+      rd.ms.forEach(m=>{
+        const spec=eng.R32[m]||eng.LATER[m];
+        const pr=eff.participants[m]||{}; const a=pr.a,b=pr.b; const w=eff.winners[m];
+        const locked=eff.realKoWin[m]!=null;
+        const box=document.createElement('div'); box.className='match';
+        box.appendChild(slotEl(m,spec[0],a,b,w,locked));
+        box.appendChild(slotEl(m,spec[1],b,a,w,locked));
+        const lab=document.createElement('div'); lab.className='mlabel'; lab.textContent='Match '+m+(locked?' · result ✓':'');
+        box.appendChild(lab);
+        col.appendChild(box);
+      });
+      wrap.appendChild(col);
+    });
+  }
+  function slotEl(m,slot,teamId,oppId,winnerId,locked){
+    const el=document.createElement('div'); el.className='slot';
+    let nm, sp='';
+    if(teamId!=null){
+      nm=T[teamId].name;
+      const decided = oppId!=null;
+      if(decided) sp='<span class="sp">'+(eng.pKO(teamId,oppId)*100).toFixed(0)+'%</span>';
+      if(winnerId===teamId) el.className='slot win'+(locked?'':' click');
+      else el.className='slot'+(decided&&!locked?' click':'');
+      if(decided && !locked){
+        el.onclick=()=>{ if(state.koWin[m]===teamId) delete state.koWin[m]; else state.koWin[m]=teamId; markDirty(); };
+      }
+    } else { nm=slotLabel(slot); el.className='slot tbd'; }
+    el.innerHTML=(teamId!=null?flagHTML(nm):'')+'<span class="sn">'+nm+'</span>'+sp;
+    return el;
+  }
+
+  /* ---------------- dirty / recompute ---------------- */
+  let dirtyTimer=null;
+  function markDirty(){
+    if(dirtyTimer) clearTimeout(dirtyTimer);
+    setStatus(true,'Picks changed — recomputing…');
+    dirtyTimer=setTimeout(runCompute,120);
+  }
+  function renderAll(){ renderHead(); renderTable(); renderGroups(); renderBracket(); }
+
+  /* ---------------- controls ---------------- */
+  document.getElementById('simSel').onchange=e=>{ state.sims=+e.target.value; scheduleCompute(); };
+  document.getElementById('refSel').onchange=e=>{ state.ref=e.target.value; renderTable(); };
+  document.getElementById('evThresh').onchange=e=>{ let v=parseFloat(e.target.value); if(isNaN(v)||v<0)v=0; state.evThresh=v; renderTable(); };
+  document.getElementById('reset').onclick=()=>{
+    GROUPS.forEach(L=>{ state.groupPos[L]={}; state.thirdAdvance[L]=false; });
+    state.koWin={}; runCompute();
+  };
+  document.getElementById('autofill').onclick=()=>{
+    // chalk: top-3 by rating per group; best 8 thirds by rating
+    const thirds=[];
+    GROUPS.forEach(L=>{
+      const sorted=members[L].slice().sort((a,b)=>ratingOf(b)-ratingOf(a));
+      state.groupPos[L]={1:sorted[0],2:sorted[1],3:sorted[2]};
+      thirds.push({L,r:ratingOf(sorted[2])});
+    });
+    thirds.sort((a,b)=>b.r-a.r);
+    GROUPS.forEach(L=>state.thirdAdvance[L]=false);
+    thirds.slice(0,8).forEach(o=>state.thirdAdvance[o.L]=true);
+    state.koWin={};
+    runCompute();
+  };
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.onclick=()=>{
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      ['odds','groups','bracket','matches'].forEach(id=>{
+        document.getElementById('tab-'+id).classList.toggle('hide', id!==tab.dataset.tab);
+      });
+    };
+  });
+
+  /* ---------------- LIVE POLYMARKET FETCH ---------------- */
+  function norm(s){return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');}
+  const PM_ALIAS={
+    usa:'unitedstates',unitedstatesofamerica:'unitedstates',us:'unitedstates',
+    turkiye:'turkey', czechrepublic:'czechia',czech:'czechia',
+    cotedivoire:'ivorycoast',cotdivoire:'ivorycoast', caboverde:'capeverde',
+    congo:'drcongo',congodr:'drcongo',drc:'drcongo',democraticrepublicofthecongo:'drcongo',democraticrepublicofcongo:'drcongo',
+    korearepublic:'southkorea',republicofkorea:'southkorea',southkorearepublic:'southkorea',
+    bosniaandherzegovina:'bosniaherzegovina',bosnia:'bosniaherzegovina'
+  };
+  function canon(s){const n=norm(s);return PM_ALIAS[n]||n;}
+  const CANON2ID={}; T.forEach((t,i)=>{ CANON2ID[canon(t.name)]=i; });
+
+  function priceFromMarket(m){
+    if(m.closed===true || m.active===false) return null;
+    const bid=parseFloat(m.bestBid), ask=parseFloat(m.bestAsk);
+    if(isFinite(bid)&&isFinite(ask)&&ask>0&&ask>=bid&&ask<=1) return (bid+ask)/2;
+    const lt=parseFloat(m.lastTradePrice); if(isFinite(lt)&&lt>0&&lt<=1) return lt;
+    try{const op=JSON.parse(m.outcomePrices); const p=parseFloat(op[0]); if(isFinite(p)&&p>=0&&p<=1) return p;}catch(e){}
+    return null;
+  }
+
+  const PM_ENDPOINTS=[
+    'https://gamma-api.polymarket.com/events?slug=world-cup-winner',
+    'https://gamma-api.polymarket.com/events/30615'
+  ];
+  async function fetchPolymarket(silent){
+    const stamp=document.getElementById('pmStamp');
+    stamp.textContent='Polymarket: fetching live prices…';
+    let data=null, lastErr=null;
+    for(const url of PM_ENDPOINTS){
+      try{
+        const res=await fetch(url+(url.includes('?')?'&':'?')+'_t='+Date.now(),{headers:{'accept':'application/json'}});
+        if(!res.ok){ lastErr='HTTP '+res.status; continue; }
+        const j=await res.json();
+        data=Array.isArray(j)?j[0]:j;
+        if(data&&data.markets) break;
+      }catch(e){ lastErr=(e&&e.message)||'network/CORS error'; }
+    }
+    if(!data||!data.markets){
+      stamp.innerHTML='⚠️ Live Polymarket fetch failed ('+(lastErr||'unknown')+'). '+
+        'This usually means the file was opened directly (file://) and the browser blocked the cross-site request. '+
+        'Prefilled/edited values are still in use — you can edit any cell manually.';
+      if(!silent) console.warn('Polymarket fetch failed:',lastErr);
+      return false;
+    }
+    let matched=0; const unmatched=[]; const now=new Date();
+    data.markets.forEach(m=>{
+      const id=CANON2ID[canon(m.groupItemTitle)];
+      const p=priceFromMarket(m);
+      if(id===undefined){ if(m.groupItemTitle && !/team|other/i.test(m.groupItemTitle)) unmatched.push(m.groupItemTitle); return; }
+      if(p===null) return;
+      window.__pm[id]=+(p*100).toFixed(2);
+      T[id].pmIsReal=true; T[id].pmLive=true;
+      matched++;
+    });
+    window.__pmTime=now;
+    stamp.innerHTML='✅ Polymarket live: <b>'+matched+'/'+N+'</b> teams updated at '+now.toLocaleTimeString()+
+      ' &nbsp;<span class="muted">(mid-price; source: gamma-api.polymarket.com)</span>'+
+      (unmatched.length?' <span class="muted">· skipped: '+unmatched.slice(0,6).join(', ')+'</span>':'');
+    renderTable();
+    return true;
+  }
+  document.getElementById('fetchPM').onclick=()=>fetchPolymarket(false);
+
+  /* ---------------- LIVE RESULTS (ESPN) ---------------- */
+  const RESULTS={byGame:{},ok:false,error:null,lastUpdated:null,completed:0,live:0,total:0};
+  const ESPN_BASE='https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard';
+  const ROUND_WINDOWS=[
+    {lab:'Group Stage',s:'20260611',e:'20260627',ko:false},
+    {lab:'Round of 32',s:'20260628',e:'20260703',ko:true},
+    {lab:'Round of 16',s:'20260704',e:'20260708',ko:true},
+    {lab:'Quarter-finals',s:'20260709',e:'20260713',ko:true},
+    {lab:'Semi-finals',s:'20260714',e:'20260717',ko:true},
+    {lab:'Third place',s:'20260718',e:'20260718',ko:true},
+    {lab:'Final',s:'20260719',e:'20260731',ko:true}
+  ];
+  function ymd(d){ return ''+d.getUTCFullYear()+String(d.getUTCMonth()+1).padStart(2,'0')+String(d.getUTCDate()).padStart(2,'0'); }
+  function classifyRound(ev){ const y=ymd(new Date(ev.date)); for(const w of ROUND_WINDOWS){ if(y>=w.s&&y<=w.e) return w; } const slug=(ev.season&&ev.season.slug)||''; return {lab:slug||'Match',ko:slug.indexOf('group')<0}; }
+  function parseEvent(ev){
+    const comp=ev.competitions&&ev.competitions[0]; if(!comp) return null;
+    const cs=comp.competitors||[]; if(cs.length<2) return null;
+    const home=cs.find(c=>c.homeAway==='home')||cs[0];
+    const away=cs.find(c=>c.homeAway==='away')||cs[1];
+    if(!home.team||!away.team) return null;
+    const st=(comp.status&&comp.status.type)||{};
+    const rd=classifyRound(ev);
+    const scorers=[];
+    (comp.details||[]).forEach(d=>{ if(d&&d.scoringPlay){ const ath=(d.athletesInvolved&&d.athletesInvolved[0]); const tn=(d.type&&d.type.text)||'';
+      scorers.push({ name: ath?(ath.displayName||ath.shortName||'Goal'):'Goal', side:(d.team&&d.team.id===home.team.id)?'home':'away', clock:(d.clock&&d.clock.displayValue)||'', og:/own goal/i.test(tn), pen:/penalt/i.test(tn) }); } });
+    let winnerId=null;
+    if(st.completed){ if(home.winner) winnerId=teamIdFromName(home.team.displayName); else if(away.winner) winnerId=teamIdFromName(away.team.displayName); }
+    return { id:ev.id, dateISO:ev.date, round:rd.ko?'ko':'group', roundLabel:rd.lab,
+      state:st.state||'pre', completed:!!st.completed,
+      home:{name:home.team.displayName, score:parseInt(home.score||'0',10), winner:!!home.winner},
+      away:{name:away.team.displayName, score:parseInt(away.score||'0',10), winner:!!away.winner},
+      scorers, winnerId, status:(st.shortDetail||st.detail||st.description||'') };
+  }
+  function dayKey(day){ return 'wc2026_day_'+day; }
+  function cacheGetDay(day){ try{ return JSON.parse(localStorage.getItem(dayKey(day))||'null'); }catch(e){ return null; } }
+  function cacheSetDay(day,o){ try{ localStorage.setItem(dayKey(day),JSON.stringify(o)); }catch(e){} }
+  async function pool(items,n,fn){ const q=items.slice(),runners=[]; for(let k=0;k<Math.min(n,q.length);k++){ runners.push((async()=>{ while(q.length){ await fn(q.shift()); } })()); } await Promise.all(runners); }
+  async function fetchResults(force){
+    const endY='20260719'; const today=new Date(); const todayY=ymd(today);
+    const plus2=ymd(new Date(today.getTime()+2*864e5));
+    const lastY=(plus2<endY)?plus2:endY;
+    const days=[]; let d=new Date(Date.UTC(2026,5,11));
+    while(ymd(d)<=lastY){ days.push(ymd(d)); d=new Date(d.getTime()+864e5); }
+    let games={},okAny=false,err=null; const toFetch=[];
+    days.forEach(day=>{ const c=force?null:cacheGetDay(day); if(c&&c.frozen&&c.games){ c.games.forEach(g=>games[g.id]=g); okAny=true; } else toFetch.push(day); });
+    await pool(toFetch,6, async day=>{
+      try{
+        const res=await fetch(ESPN_BASE+'?dates='+day+'&_t='+Date.now());
+        if(!res.ok){ err='HTTP '+res.status; return; }
+        const j=await res.json();
+        const evs=(j.events||[]).map(parseEvent).filter(Boolean);
+        evs.forEach(g=>games[g.id]=g); okAny=true;
+        const frozen=evs.length>0 && evs.every(g=>g.completed) && day<todayY;
+        cacheSetDay(day,{fetchedAt:Date.now(),frozen,games:evs});
+      }catch(e){ err=(e&&e.message)||'network/CORS error'; }
+    });
+    RESULTS.byGame=games; RESULTS.ok=okAny; RESULTS.error=okAny?null:err; RESULTS.lastUpdated=new Date();
+    RESULTS.completed=Object.values(games).filter(g=>g.completed).length;
+    RESULTS.live=Object.values(games).filter(g=>g.state==='in').length;
+    RESULTS.total=Object.keys(games).length;
+    updateResultsBanner(); renderMatches();
+    return okAny;
+  }
+  function resultsSig(){ return Object.values(RESULTS.byGame||{}).map(g=>g.id+':'+g.home.score+'-'+g.away.score+':'+g.state).sort().join('|'); }
+  let lastSig='';
+  function maybeRecompute(){ const s=resultsSig(); if(s!==lastSig){ lastSig=s; runCompute(); } else { renderMatches(); renderGroups(); renderBracket(); } }
+  function updateResultsBanner(){
+    const el=document.getElementById('resultsBanner'); if(!el) return;
+    if(!RESULTS.ok){ el.innerHTML='📡 Live results unavailable'+(RESULTS.error?(' ('+RESULTS.error+')'):'')+' — odds use market baseline + your manual picks. <a href="#" id="retryResults">Retry</a>';
+      const r=document.getElementById('retryResults'); if(r) r.onclick=(e)=>{e.preventDefault();fetchResults(true).then(maybeRecompute);}; return; }
+    const upd=RESULTS.lastUpdated?RESULTS.lastUpdated.toLocaleTimeString():'';
+    el.innerHTML='📡 <b>'+RESULTS.completed+'</b> completed'+(RESULTS.live?(' · <span style="color:var(--warn)">'+RESULTS.live+' live</span>'):'')+' / '+RESULTS.total+' fetched · odds conditioned on results · <span class="muted">updated '+upd+'</span>';
+  }
+  function fmtScorer(s){ return s.name+(s.clock?(' '+s.clock.replace(/'+$/,'')+"'"):'')+(s.pen?' (P)':'')+(s.og?' (OG)':''); }
+  function fmtDay(iso){ try{ return new Date(iso+'T12:00:00Z').toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'}); }catch(e){ return iso; } }
+  function matchRowHTML(g){
+    const live=g.state==='in', done=g.completed;
+    const sc=(done||live)?(g.home.score+'–'+g.away.score):'';
+    const time=done?(g.status||'FT'):live?(g.status||'LIVE'):(function(){try{return new Date(g.dateISO).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return '';}})();
+    const hw=g.home.winner?'font-weight:700':'', aw=g.away.winner?'font-weight:700':'';
+    let sH='';
+    if(g.scorers&&g.scorers.length){ const hs=g.scorers.filter(s=>s.side==='home').map(fmtScorer).join(', '); const as=g.scorers.filter(s=>s.side==='away').map(fmtScorer).join(', ');
+      if(hs||as) sH='<div class="scorers small muted">'+(hs?('⚽ '+hs):'')+(hs&&as?' &nbsp;|&nbsp; ':'')+(as?('⚽ '+as):'')+'</div>'; }
+    return '<div class="matchrow'+(live?' live':'')+'">'+
+      '<div class="mteams">'+
+        '<div class="mt" style="'+hw+'">'+flagHTML(g.home.name)+'<span>'+g.home.name+'</span></div>'+
+        '<div class="msc">'+(sc||'<span class="muted small">v</span>')+'</div>'+
+        '<div class="mt away" style="'+aw+'"><span>'+g.away.name+'</span>'+flagHTML(g.away.name)+'</div>'+
+      '</div>'+
+      '<div class="mmeta small '+(live?'mlive':'muted')+'">'+time+'</div>'+sH+'</div>';
+  }
+  function renderMatches(){
+    const wrap=document.getElementById('matchesWrap'); if(!wrap) return;
+    const games=Object.values(RESULTS.byGame||{});
+    if(!games.length){ wrap.innerHTML='<div class="muted small">No fixtures loaded'+(RESULTS.error?(' — '+RESULTS.error):'')+'. Use Refresh, or open the page over http(s) if blocked.</div>'; return; }
+    games.sort((a,b)=> a.dateISO<b.dateISO?-1:(a.dateISO>b.dateISO?1:0));
+    const byRound={}; games.forEach(g=>{ (byRound[g.roundLabel]=byRound[g.roundLabel]||[]).push(g); });
+    let html='';
+    ROUND_WINDOWS.map(w=>w.lab).forEach(lab=>{ const gs=byRound[lab]; if(!gs) return;
+      const doneN=gs.filter(g=>g.completed).length;
+      html+='<h3 style="margin:12px 0 6px;font-size:14px">'+lab+' <span class="muted small">('+doneN+'/'+gs.length+')</span></h3>';
+      let curDay='';
+      gs.forEach(g=>{ const day=g.dateISO.slice(0,10); if(day!==curDay){ curDay=day; html+='<div class="muted small" style="margin:8px 0 3px">'+fmtDay(day)+'</div>'; } html+=matchRowHTML(g); });
+    });
+    wrap.innerHTML=html;
+  }
+  document.getElementById('refreshResults').onclick=()=>fetchResults(true).then(maybeRecompute);
+
+  /* ---------------- SAVE / LOAD SCENARIOS ---------------- */
+  const LS_KEY='wc2026_scenarios';
+  const LS_LAST='wc2026_lastSession';
+  let lsOK=true;
+  try{ localStorage.setItem('__wc_t','1'); localStorage.removeItem('__wc_t'); }catch(e){ lsOK=false; }
+
+  function serializeState(name){
+    return {
+      app:'wc2026', v:1, name:name||'', savedAt:new Date().toISOString(),
+      groupPos:state.groupPos, thirdAdvance:state.thirdAdvance, koWin:state.koWin,
+      sims:state.sims, ref:state.ref, evThresh:state.evThresh,
+      pm:(window.__pm||T.map(t=>t.pmPrefill)).slice(),
+      pmReal:T.map(t=>!!t.pmIsReal)
+    };
+  }
+  function applyState(s){
+    if(!s||s.app!=='wc2026'){ scenMsg('Not a valid scenario file.',true); return false; }
+    GROUPS.forEach(L=>{
+      state.groupPos[L]=(s.groupPos&&s.groupPos[L])?Object.assign({},s.groupPos[L]):{};
+      state.thirdAdvance[L]=!!(s.thirdAdvance&&s.thirdAdvance[L]);
+    });
+    state.koWin=Object.assign({},s.koWin||{});
+    if(s.sims){ state.sims=+s.sims; document.getElementById('simSel').value=String(s.sims); }
+    if(s.ref){ state.ref=s.ref; document.getElementById('refSel').value=s.ref; }
+    if(typeof s.evThresh==='number'){ state.evThresh=s.evThresh; document.getElementById('evThresh').value=s.evThresh; }
+    if(Array.isArray(s.pm)&&s.pm.length===N){ window.__pm=s.pm.slice(); }
+    if(Array.isArray(s.pmReal)&&s.pmReal.length===N){ s.pmReal.forEach((b,i)=>{ if(b) T[i].pmIsReal=true; }); }
+    renderAll(); runCompute();
+    return true;
+  }
+  function loadAll(){ if(!lsOK) return {}; try{ return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); }catch(e){ return {}; } }
+  function saveAll(o){ if(!lsOK) return false; try{ localStorage.setItem(LS_KEY,JSON.stringify(o)); return true; }catch(e){ return false; } }
+  function saveLast(){ if(!lsOK) return; try{ localStorage.setItem(LS_LAST,JSON.stringify(serializeState('(autosave)'))); }catch(e){} }
+  function scenMsg(t,warn){ const el=document.getElementById('scenMsg'); el.textContent=t; el.style.color=warn?'var(--sell)':'var(--mut)'; }
+  function refreshScenList(sel){
+    const all=loadAll(); const list=document.getElementById('scenList');
+    const names=Object.keys(all).sort();
+    list.innerHTML='<option value="">— load saved ('+names.length+') —</option>'+
+      names.map(n=>'<option value="'+encodeURIComponent(n)+'">'+n+'</option>').join('');
+    if(sel) list.value=encodeURIComponent(sel);
+  }
+
+  document.getElementById('scenSave').onclick=()=>{
+    const name=(document.getElementById('scenName').value||'').trim();
+    if(!name){ scenMsg('Enter a name first.',true); return; }
+    if(!lsOK){ scenMsg('Browser storage unavailable — use Export instead.',true); return; }
+    const all=loadAll(); all[name]=serializeState(name);
+    if(saveAll(all)){ refreshScenList(name); scenMsg('Saved “'+name+'”.'); } else scenMsg('Save failed — try Export.',true);
+  };
+  document.getElementById('scenList').onchange=e=>{
+    const key=e.target.value; if(!key) return;
+    const name=decodeURIComponent(key); const all=loadAll();
+    if(all[name]){ document.getElementById('scenName').value=name; if(applyState(all[name])) scenMsg('Loaded “'+name+'”.'); }
+  };
+  document.getElementById('scenDelete').onclick=()=>{
+    const key=document.getElementById('scenList').value; if(!key){ scenMsg('Pick a saved scenario to delete.',true); return; }
+    const name=decodeURIComponent(key); const all=loadAll();
+    if(all[name]){ delete all[name]; saveAll(all); refreshScenList(); scenMsg('Deleted “'+name+'”.'); }
+  };
+  document.getElementById('scenExport').onclick=()=>{
+    const name=(document.getElementById('scenName').value||'wc2026-scenario').trim();
+    const blob=new Blob([JSON.stringify(serializeState(name),null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download=name.replace(/[^\w.-]+/g,'_')+'.json'; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },100);
+    scenMsg('Exported '+a.download+'.');
+  };
+  document.getElementById('scenImport').onclick=()=>document.getElementById('scenFile').click();
+  document.getElementById('scenFile').onchange=e=>{
+    const f=e.target.files&&e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{ try{ const s=JSON.parse(r.result); if(applyState(s)){ document.getElementById('scenName').value=s.name||f.name.replace(/\.json$/,''); scenMsg('Imported “'+(s.name||f.name)+'”.'); } }catch(err){ scenMsg('Could not read file: '+err.message,true); } };
+    r.readAsText(f); e.target.value='';
+  };
+
+  /* ---------------- SQLITE PERSISTENCE (sql.js + IndexedDB) ---------------- */
+  const SQL_CDN='https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/';
+  let _sql=null,_db=null,_sqlLoading=null;
+  function dbMsg(t,warn){ const e=document.getElementById('dbMsg'); if(!e)return; e.textContent=t; e.style.color=warn?'var(--sell)':'var(--mut)'; }
+  function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('cannot load SQLite engine (needs internet)')); document.head.appendChild(s); }); }
+  function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open('wc2026db',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+  async function idbSet(k,v){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(v,k); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
+  async function idbGet(k){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction('kv','readonly'); const rq=tx.objectStore('kv').get(k); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }
+  function dbSchema(db){
+    db.run('CREATE TABLE IF NOT EXISTS scenarios(name TEXT PRIMARY KEY, savedAt TEXT, json TEXT);');
+    db.run('CREATE TABLE IF NOT EXISTS snapshots(ts TEXT, team TEXT, grp TEXT, fair REAL, scn REAL, poly REAL, edge REAL, ev REAL, signal TEXT, ranked INTEGER);');
+  }
+  async function ensureDb(){
+    if(_db) return _db;
+    if(!_sqlLoading){ _sqlLoading=(async()=>{
+      dbMsg('loading SQLite engine…');
+      if(typeof initSqlJs==='undefined') await loadScript(SQL_CDN+'sql-wasm.js');
+      _sql=await initSqlJs({locateFile:f=>SQL_CDN+f});
+      let bytes=null; try{ bytes=await idbGet('db'); }catch(e){}
+      _db=new _sql.Database(bytes?new Uint8Array(bytes):undefined);
+      dbSchema(_db); return _db;
+    })(); }
+    await _sqlLoading; return _db;
+  }
+  async function persistDb(){ try{ const bytes=_db.export(); await idbSet('db', bytes.buffer); }catch(e){} }
+  function dbCount(t){ try{ const r=_db.exec('SELECT COUNT(*) FROM '+t); return (r[0]&&r[0].values[0][0])||0; }catch(e){ return 0; } }
+  async function dbSnapshot(){
+    try{
+      const db=await ensureDb(); const ts=new Date().toISOString();
+      const rows=rowData().slice().sort((a,b)=>b.mkt-a.mkt);
+      db.run('BEGIN');
+      const stmt=db.prepare('INSERT INTO snapshots VALUES (?,?,?,?,?,?,?,?,?,?)');
+      rows.forEach((r,idx)=>stmt.run([ts,r.name,r.grp,+(r.mkt*100).toFixed(3),+(r.scn*100).toFixed(3),r.pm,+r.edge.toFixed(3),+r.ev.toFixed(2),r.sig,idx+1]));
+      stmt.free();
+      db.run('INSERT OR REPLACE INTO scenarios VALUES (?,?,?)',['(latest snapshot)',ts,JSON.stringify(serializeState('(latest snapshot)'))]);
+      db.run('COMMIT'); await persistDb();
+      dbMsg('✅ snapshot saved '+new Date().toLocaleTimeString()+' · '+dbCount('snapshots')+' odds rows, '+dbCount('scenarios')+' scenarios in DB');
+    }catch(e){ dbMsg('SQLite unavailable: '+e.message,true); }
+  }
+  async function dbSaveScenario(){
+    try{
+      const name=(document.getElementById('scenName').value||'').trim()||('scenario '+new Date().toLocaleString());
+      const db=await ensureDb();
+      db.run('INSERT OR REPLACE INTO scenarios VALUES (?,?,?)',[name,new Date().toISOString(),JSON.stringify(serializeState(name))]);
+      await persistDb(); dbMsg('✅ scenario “'+name+'” saved to DB · '+dbCount('scenarios')+' total');
+    }catch(e){ dbMsg('SQLite unavailable: '+e.message,true); }
+  }
+  async function dbExport(){
+    try{ const db=await ensureDb(); const blob=new Blob([db.export()],{type:'application/octet-stream'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='worldcup2026.sqlite'; document.body.appendChild(a); a.click();
+      setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},120); dbMsg('exported worldcup2026.sqlite ('+dbCount('snapshots')+' odds rows)'); }
+    catch(e){ dbMsg('Export failed: '+e.message,true); }
+  }
+  async function dbImport(file){
+    try{ const buf=await file.arrayBuffer(); await ensureDb(); _db=new _sql.Database(new Uint8Array(buf)); dbSchema(_db); await persistDb();
+      dbMsg('imported '+file.name+' · '+dbCount('snapshots')+' odds rows, '+dbCount('scenarios')+' scenarios'); }
+    catch(e){ dbMsg('Import failed: '+e.message,true); }
+  }
+  document.getElementById('dbSnap').onclick=()=>dbSnapshot();
+  document.getElementById('dbSaveScn').onclick=()=>dbSaveScenario();
+  document.getElementById('dbExport').onclick=()=>dbExport();
+  document.getElementById('dbImport').onclick=()=>document.getElementById('dbFile').click();
+  document.getElementById('dbFile').onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(f) dbImport(f); e.target.value=''; };
+
+  // init
+  renderHead(); renderTable(); renderGroups(); renderBracket();
+  refreshScenList();
+  let restored=false;
+  if(lsOK){
+    try{
+      const last=JSON.parse(localStorage.getItem(LS_LAST)||'null');
+      if(last && last.app==='wc2026'){ restored=applyState(last); if(restored) scenMsg('Restored your last session — use Reset to start fresh.'); }
+    }catch(e){}
+  }
+  if(!restored) runCompute();
+  if(!lsOK) scenMsg('Browser storage is unavailable here — named saves & auto-restore are off, but Export/Import to a file still works.',true);
+  if(document.getElementById('autoPM').checked){ fetchPolymarket(true); }
+  // live results → condition odds, then poll
+  fetchResults(false).then(()=>{ lastSig=resultsSig(); runCompute(); setInterval(()=>fetchResults(false).then(maybeRecompute), 60000); });
+})();
+</script>
+</body>
+</html>
