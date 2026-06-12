@@ -1041,16 +1041,19 @@
   }
 
   const PM_ENDPOINTS=[
-    'https://gamma-api.polymarket.com/events?slug=world-cup-winner',
+    '/api/polymarket?slug=world-cup-winner',                          // same-origin CDN-cached proxy (prod)
+    'https://gamma-api.polymarket.com/events?slug=world-cup-winner',  // direct fallback (local dev / proxy down)
     'https://gamma-api.polymarket.com/events/30615'
   ];
+  // Cache-bust direct upstream calls; leave proxy URLs stable so the CDN cache hits.
+  function bust(url){ return url.indexOf('/api/')===0 ? url : url+(url.includes('?')?'&':'?')+'_t='+Date.now(); }
   async function fetchPolymarket(silent){
     const stamp=document.getElementById('pmStamp');
     stamp.textContent='Polymarket: fetching live prices…';
     let data=null, lastErr=null;
     for(const url of PM_ENDPOINTS){
       try{
-        const res=await fetch(url+(url.includes('?')?'&':'?')+'_t='+Date.now(),{headers:{'accept':'application/json'}});
+        const res=await fetch(bust(url),{headers:{'accept':'application/json'}});
         if(!res.ok){ lastErr='HTTP '+res.status; continue; }
         const j=await res.json();
         data=Array.isArray(j)?j[0]:j;
@@ -1085,16 +1088,22 @@
 
   /* ---------------- GOLDEN BOOT (Polymarket top-scorer market) ---------------- */
   // window.__gb : { normalisedName -> {name, price(0..1)} }
-  const GB_ENDPOINT='https://gamma-api.polymarket.com/events?slug=world-cup-golden-boot-winner';
+  const GB_ENDPOINTS=[
+    '/api/polymarket?slug=world-cup-golden-boot-winner',                          // CDN-cached proxy (prod)
+    'https://gamma-api.polymarket.com/events?slug=world-cup-golden-boot-winner'   // direct fallback
+  ];
   async function fetchGoldenBoot(silent){
     const stamp=document.getElementById('gbStamp');
     stamp.textContent='Golden Boot: fetching live prices…';
     let data=null,lastErr=null;
-    try{
-      const res=await fetch(GB_ENDPOINT+'&_t='+Date.now(),{headers:{'accept':'application/json'}});
-      if(!res.ok) lastErr='HTTP '+res.status;
-      else { const j=await res.json(); data=Array.isArray(j)?j[0]:j; }
-    }catch(e){ lastErr=(e&&e.message)||'network/CORS error'; }
+    for(const url of GB_ENDPOINTS){
+      try{
+        const res=await fetch(bust(url),{headers:{'accept':'application/json'}});
+        if(!res.ok){ lastErr='HTTP '+res.status; continue; }
+        const j=await res.json(); data=Array.isArray(j)?j[0]:j;
+        if(data&&data.markets) break;
+      }catch(e){ lastErr=(e&&e.message)||'network/CORS error'; }
+    }
     if(!data||!data.markets){
       stamp.innerHTML='⚠️ Live Golden Boot fetch failed ('+(lastErr||'unknown')+'). '+
         'Opening over http(s) (not file://) is required for the cross-site request.';
@@ -1195,7 +1204,9 @@
     days.forEach(day=>{ const c=force?null:cacheGetDay(day); if(c&&c.frozen&&c.games){ c.games.forEach(g=>games[g.id]=g); okAny=true; } else toFetch.push(day); });
     await pool(toFetch,6, async day=>{
       try{
-        const res=await fetch(ESPN_BASE+'?dates='+day+'&_t='+Date.now());
+        let res=null;
+        try{ const pr=await fetch('/api/espn?dates='+day); if(pr.ok) res=pr; }catch(e){} // CDN-cached proxy first
+        if(!res){ res=await fetch(ESPN_BASE+'?dates='+day+'&_t='+Date.now()); }           // direct fallback
         if(!res.ok){ err='HTTP '+res.status; return; }
         const j=await res.json();
         const evs=(j.events||[]).map(parseEvent).filter(Boolean);
