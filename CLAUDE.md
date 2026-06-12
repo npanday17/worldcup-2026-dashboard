@@ -1,8 +1,8 @@
 # World Cup 2026 Odds Dashboard — project guide
 
 A single-page, fully client-side dashboard: model "fair" championship odds for all 48
-teams vs live Polymarket prices, an interactive bracket simulator, live ESPN results that
-condition the odds, and SQLite snapshots. Deploys to Vercel as one static `index.html`.
+teams vs live Polymarket prices, an interactive bracket simulator, and live ESPN results that
+condition the odds. Deploys to Vercel as one static `index.html`.
 
 ## Golden rule — `index.html` is GENERATED, never edit it by hand
 
@@ -23,7 +23,7 @@ Source of truth:
 ## Build / test / deploy
 
 ```bash
-npm install            # one-time: installs jsdom + sql.js (dev/test only)
+npm install            # one-time: dev/test deps only
 npm run build          # assemble index.html from the sources (fast)
 npm run test           # run the math/logic checks (expect "27 passed, 0 failed")
 npm run rebuild        # re-run calibration THEN assemble (see below for when)
@@ -51,7 +51,7 @@ champ ≈ 0 gives no signal. To refresh the `PROGRESSION` snapshot, re-fetch
 (mid-price per `groupItemTitle`) and paste the updated values, then `npm run rebuild`.
 
 ## Run locally (do NOT open index.html via file://)
-The page fetches Polymarket, ESPN, and a SQLite CDN, and uses localStorage/IndexedDB — all of
+The page fetches Polymarket and ESPN and uses localStorage — all of
 which are flaky or blocked under `file://`. Serve it:
 ```bash
 python3 -m http.server 8000   # then open http://localhost:8000/index.html
@@ -66,7 +66,7 @@ survives upstream CORS changes in prod and still works in local `python http.ser
 - Polymarket prices: `/api/polymarket?slug=world-cup-winner` → `gamma-api.polymarket.com`
 - Golden Boot odds: `/api/polymarket?slug=world-cup-golden-boot-winner` → `gamma-api.polymarket.com`
 - Match results + scorers: `/api/espn?dates=YYYYMMDD` → `site.api.espn.com/.../fifa.world/scoreboard`
-- SQLite engine (sql.js WASM): cdnjs (direct). All others are inlined / offline-capable.
+- Everything else (engine, data, flags) is inlined / offline-capable.
 
 ## Serverless proxy (`api/`)
 - `api/polymarket.js`, `api/espn.js` — Vercel functions that front the upstreams with a strict

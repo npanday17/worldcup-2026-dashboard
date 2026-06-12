@@ -103,7 +103,6 @@
   .flex1{flex:1}
   .right{margin-left:auto}
   #scenarioBar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:2px 0 6px}
-  #dbBar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
   #scenarioBar .vsep{width:1px;height:18px;background:var(--line);margin:0 2px}
   #scenName{padding:5px 8px}
   #scenList{max-width:200px}
@@ -175,15 +174,6 @@
     <button class="btn" id="scenImport">⤒ Import</button>
     <input type="file" id="scenFile" accept="application/json,.json" class="hide"/>
     <span class="muted" id="scenMsg"></span>
-  </div>
-  <div class="small" id="dbBar">
-    <b class="muted">🗄 SQLite DB:</b>
-    <button class="btn" id="dbSnap">Snapshot odds → DB</button>
-    <button class="btn" id="dbSaveScn">Save scenario → DB</button>
-    <button class="btn" id="dbExport">⤓ Export .sqlite</button>
-    <button class="btn" id="dbImport">⤒ Import .sqlite</button>
-    <input type="file" id="dbFile" accept=".sqlite,.db,application/octet-stream" class="hide"/>
-    <span class="muted" id="dbMsg">engine loads on first use</span>
   </div>
 
   <div class="status"><span class="dot idle" id="statusDot"></span><span id="statusText">Ready.</span></div>
@@ -1064,70 +1054,6 @@
     r.onload=()=>{ try{ const s=JSON.parse(r.result); if(applyState(s)){ document.getElementById('scenName').value=s.name||f.name.replace(/\.json$/,''); scenMsg('Imported “'+(s.name||f.name)+'”.'); } }catch(err){ scenMsg('Could not read file: '+err.message,true); } };
     r.readAsText(f); e.target.value='';
   };
-
-  /* ---------------- SQLITE PERSISTENCE (sql.js + IndexedDB) ---------------- */
-  const SQL_CDN='https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/';
-  let _sql=null,_db=null,_sqlLoading=null;
-  function dbMsg(t,warn){ const e=document.getElementById('dbMsg'); if(!e)return; e.textContent=t; e.style.color=warn?'var(--sell)':'var(--mut)'; }
-  function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('cannot load SQLite engine (needs internet)')); document.head.appendChild(s); }); }
-  function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open('wc2026db',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
-  async function idbSet(k,v){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(v,k); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
-  async function idbGet(k){ const db=await idb(); return new Promise((res,rej)=>{ const tx=db.transaction('kv','readonly'); const rq=tx.objectStore('kv').get(k); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); }); }
-  function dbSchema(db){
-    db.run('CREATE TABLE IF NOT EXISTS scenarios(name TEXT PRIMARY KEY, savedAt TEXT, json TEXT);');
-    db.run('CREATE TABLE IF NOT EXISTS snapshots(ts TEXT, team TEXT, grp TEXT, fair REAL, scn REAL, poly REAL, edge REAL, ev REAL, signal TEXT, ranked INTEGER);');
-  }
-  async function ensureDb(){
-    if(_db) return _db;
-    if(!_sqlLoading){ _sqlLoading=(async()=>{
-      dbMsg('loading SQLite engine…');
-      if(typeof initSqlJs==='undefined') await loadScript(SQL_CDN+'sql-wasm.js');
-      _sql=await initSqlJs({locateFile:f=>SQL_CDN+f});
-      let bytes=null; try{ bytes=await idbGet('db'); }catch(e){}
-      _db=new _sql.Database(bytes?new Uint8Array(bytes):undefined);
-      dbSchema(_db); return _db;
-    })(); }
-    await _sqlLoading; return _db;
-  }
-  async function persistDb(){ try{ const bytes=_db.export(); await idbSet('db', bytes.buffer); }catch(e){} }
-  function dbCount(t){ try{ const r=_db.exec('SELECT COUNT(*) FROM '+t); return (r[0]&&r[0].values[0][0])||0; }catch(e){ return 0; } }
-  async function dbSnapshot(){
-    try{
-      const db=await ensureDb(); const ts=new Date().toISOString();
-      const rows=rowData().slice().sort((a,b)=>b.mkt-a.mkt);
-      db.run('BEGIN');
-      const stmt=db.prepare('INSERT INTO snapshots VALUES (?,?,?,?,?,?,?,?,?,?)');
-      rows.forEach((r,idx)=>stmt.run([ts,r.name,r.grp,+(r.mkt*100).toFixed(3),+(r.scn*100).toFixed(3),r.pm,+r.edge.toFixed(3),+r.ev.toFixed(2),r.sig,idx+1]));
-      stmt.free();
-      db.run('INSERT OR REPLACE INTO scenarios VALUES (?,?,?)',['(latest snapshot)',ts,JSON.stringify(serializeState('(latest snapshot)'))]);
-      db.run('COMMIT'); await persistDb();
-      dbMsg('✅ snapshot saved '+new Date().toLocaleTimeString()+' · '+dbCount('snapshots')+' odds rows, '+dbCount('scenarios')+' scenarios in DB');
-    }catch(e){ dbMsg('SQLite unavailable: '+e.message,true); }
-  }
-  async function dbSaveScenario(){
-    try{
-      const name=(document.getElementById('scenName').value||'').trim()||('scenario '+new Date().toLocaleString());
-      const db=await ensureDb();
-      db.run('INSERT OR REPLACE INTO scenarios VALUES (?,?,?)',[name,new Date().toISOString(),JSON.stringify(serializeState(name))]);
-      await persistDb(); dbMsg('✅ scenario “'+name+'” saved to DB · '+dbCount('scenarios')+' total');
-    }catch(e){ dbMsg('SQLite unavailable: '+e.message,true); }
-  }
-  async function dbExport(){
-    try{ const db=await ensureDb(); const blob=new Blob([db.export()],{type:'application/octet-stream'});
-      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='worldcup2026.sqlite'; document.body.appendChild(a); a.click();
-      setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},120); dbMsg('exported worldcup2026.sqlite ('+dbCount('snapshots')+' odds rows)'); }
-    catch(e){ dbMsg('Export failed: '+e.message,true); }
-  }
-  async function dbImport(file){
-    try{ const buf=await file.arrayBuffer(); await ensureDb(); _db=new _sql.Database(new Uint8Array(buf)); dbSchema(_db); await persistDb();
-      dbMsg('imported '+file.name+' · '+dbCount('snapshots')+' odds rows, '+dbCount('scenarios')+' scenarios'); }
-    catch(e){ dbMsg('Import failed: '+e.message,true); }
-  }
-  document.getElementById('dbSnap').onclick=()=>dbSnapshot();
-  document.getElementById('dbSaveScn').onclick=()=>dbSaveScenario();
-  document.getElementById('dbExport').onclick=()=>dbExport();
-  document.getElementById('dbImport').onclick=()=>document.getElementById('dbFile').click();
-  document.getElementById('dbFile').onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(f) dbImport(f); e.target.value=''; };
 
   // init
   renderHead(); renderTable(); renderGroups(); renderBracket();

@@ -2,7 +2,7 @@
   "name": "worldcup-2026-odds-dashboard",
   "version": "1.0.0",
   "private": true,
-  "description": "Interactive 2026 FIFA World Cup fair-odds vs Polymarket dashboard with live results, an interactive bracket simulator, and SQLite snapshots.",
+  "description": "Interactive 2026 FIFA World Cup fair-odds vs Polymarket dashboard with live results and an interactive bracket simulator.",
   "scripts": {
     "build": "node assemble.js",
     "calibrate": "node calibrate.js",
@@ -12,7 +12,6 @@
     "deploy": "vercel --prod"
   },
   "devDependencies": {
-    "jsdom": "^29.1.1",
-    "sql.js": "^1.10.3"
+    "jsdom": "^29.1.1"
   }
 }

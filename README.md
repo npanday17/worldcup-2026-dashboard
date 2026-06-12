@@ -7,12 +7,12 @@ A single-page, fully client-side dashboard:
 - **Interactive bracket** — pick group 1/2/3 and knockout winners; championship + round-by-round odds recompute live (Monte Carlo).
 - **Live results** — full schedule + match scores & goal scorers from ESPN; upcoming matches show the model's win/draw/win odds, and completed ones condition the fair odds.
 - **Golden Boot** — live top-scorers (actual goals from ESPN) joined with Polymarket's Golden Boot market price.
-- **Save** — named scenarios + export/import, and a real **SQLite** database (snapshots of odds/edges) you can query anywhere.
+- **Save** — named scenarios saved to your browser, plus export/import to a `.json` file.
 
 ## Quick start
 
 ```bash
-npm install                 # dev/test deps only (jsdom, sql.js)
+npm install                 # dev/test deps only
 npm run build               # generate index.html from the sources
 python3 -m http.server 8000 # then open http://localhost:8000/index.html
 ```
