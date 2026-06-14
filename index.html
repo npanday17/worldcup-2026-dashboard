@@ -156,9 +156,9 @@
           <option value="30000">30k (precise)</option>
         </select>
       </label>
-      <label class="ctl" title="Which probability the Edge / EV / Signal columns compare against Polymarket: the static market baseline (Fair %) or your live scenario (Scn %).">Edge vs
+      <label class="ctl" title="Which probability the Edge / EV / Signal columns compare against Polymarket: the live Fair baseline (results only) or your scenario (results + your manual picks).">Edge vs
         <select class="ctl" id="refSel" style="margin-left:6px;padding:2px">
-          <option value="market" selected>Market baseline (Fair %)</option>
+          <option value="market" selected>Fair (live, results)</option>
           <option value="live">Scenario (results + picks)</option>
         </select>
       </label>
@@ -258,9 +258,9 @@
 
   <details class="help">
     <summary>Methodology, signals & disclaimer</summary>
-    <p><b>Reference (fair) odds.</b> Each team's championship probability is derived from the consensus sportsbook outright market (DraftKings board via ESPN, Apr 2026), converted from American odds to implied probability and <i>de-vigged</i> (normalised to sum to 100%, removing the ~18% bookmaker overround). Team strength ratings were then calibrated by Monte Carlo so the simulated tournament reproduces those championship probabilities (within ~0.4pp). This is your “market-implied baseline.”</p>
+    <p><b>Reference (fair) odds.</b> Each team's championship probability is derived from the consensus sportsbook outright market (DraftKings board via ESPN, Apr 2026), converted from American odds to implied probability and <i>de-vigged</i> (normalised to sum to 100%, removing the ~18% bookmaker overround). Team strength ratings were then calibrated by Monte Carlo so the simulated tournament reproduces those championship probabilities (within ~0.4pp). This “market-implied baseline” is now updated <b>live</b>: as real matches finish, the Fair % is re-simulated conditioned on those results (anchored so it equals the published price before a team plays, and falls toward 0 once a team is eliminated).</p>
     <p><b>Simulation.</b> Group matches use a Davidson win/draw/loss model; knockout matches a Bradley–Terry win model, over the exact official 2026 bracket including the 8-best-third-place routing (all 495 FIFA Annex C combinations embedded). Locking outcomes conditions the remaining simulation, so championship and round-by-round odds update live.</p>
-    <p><b>Edge & signals.</b> Edge (pp) = Reference% − Polymarket%. EV% = Reference / Polymarket − 1 (expected value of buying a YES share at the Polymarket price). BUY when EV ≥ threshold (Polymarket too cheap vs fair), SELL when EV ≤ −threshold. Switch “Edge vs” to <i>Live model</i> to price your specific bracket scenario instead of the static baseline.</p>
+    <p><b>Edge & signals.</b> Edge (pp) = Reference% − Polymarket%. EV% = Reference / Polymarket − 1 (expected value of buying a YES share at the Polymarket price). BUY when EV ≥ threshold (Polymarket too cheap vs fair), SELL when EV ≤ −threshold. Switch “Edge vs” to <i>Scenario</i> to price your specific bracket picks instead of the results-only Fair baseline.</p>
     <p><b>Disclaimer.</b> This is an analytical tool, not financial advice. “Fair” odds are only as good as the inputs; prediction-market prices can be right and the book consensus wrong. Markets move — refresh the Polymarket cells with live values before acting, and manage risk yourself.</p>
   </details>
 </div>
@@ -648,15 +648,18 @@
   GROUPS.forEach(L=>{ state.groupPos[L]={}; state.thirdAdvance[L]=false; });
 
   let lastStats = DATA.defaultStats; // seeded snapshot until first run
+  let fairArr = T.map(t=>t.marketProb); // live Fair % (results-only, market-anchored); seeded to market until first run
+  let scnArr  = T.map(t=>t.marketProb); // Scenario % (results + manual picks, market-anchored)
 
   // ---- helpers ----
   const pctF = x => (x*100).toFixed(2);
   function fmtAm(p){ if(p<=0) return '—'; if(p>=0.5) return '-'+Math.round(p/(1-p)*100); return '+'+Math.round((1-p)/p*100); }
   function ratingOf(id){ return T[id].rating; }
 
-  // Build fixes object for engine = live results conditioning + your manual picks
-  function buildFixes(){
-    const eff=computeEffective();
+  // Build fixes object for engine. includePicks=true → live results + your manual picks (Scenario);
+  // includePicks=false → real results ONLY (the live Fair baseline).
+  function buildFixes(includePicks=true){
+    const eff=computeEffective(includePicks);
     return { groupGoals:eff.groupGoals, groupOrder:eff.groupOrder, thirdIn:eff.thirdIn, thirdOut:[], koWin:eff.koWin };
   }
 
@@ -677,7 +680,7 @@
   }
 
   // Merge live results with manual picks into one effective tournament state.
-  function computeEffective(){
+  function computeEffective(includePicks=true){
     const eff={groupGoals:{},groupOrder:{},groupComplete:{},standings:{},realGoals:{},playedCount:{},
       thirdIn:[],thirdSlot:{},participants:{},winners:{},realKoWin:{},koWin:{},
       completed:0,live:0,allComplete:false};
@@ -703,7 +706,7 @@
       eff.groupComplete[L]= goals.length>=6;
       eff.standings[L]=groupStandings(L, goals);
       const gp=state.groupPos[L];
-      const userSet = gp[1]!=null && gp[2]!=null;
+      const userSet = includePicks && gp[1]!=null && gp[2]!=null;
       if(userSet){
         // your manual pick always governs (scenario) — even mid-group
         const rest=members[L].filter(id=>id!==gp[1]&&id!==gp[2]);
@@ -727,7 +730,7 @@
       thirds.sort((x,y)=> y.pts-x.pts || y.gd-x.gd || y.gf-x.gf || (T[y.id].rating-T[x.id].rating));
       eff.thirdIn=thirds.slice(0,8).map(o=>o.L);
     } else {
-      eff.thirdIn=GROUPS.filter(L=>state.thirdAdvance[L]);
+      eff.thirdIn=includePicks ? GROUPS.filter(L=>state.thirdAdvance[L]) : [];
     }
     // ---- third-place routing (only if 8 thirds with known order) ----
     if(eff.thirdIn.length===8 && eff.thirdIn.every(L=>eff.groupOrder[L])){
@@ -755,15 +758,35 @@
         const g=koGames.find(g=>{const x=teamIdFromName(g.home.name),y=teamIdFromName(g.away.name); return (x===a&&y===b)||(x===b&&y===a);});
         if(g){ let wid=(g.winnerId!=null)?g.winnerId:(g.home.score>g.away.score?teamIdFromName(g.home.name):(g.away.score>g.home.score?teamIdFromName(g.away.name):null));
           if(wid!=null){ w=wid; eff.realKoWin[m]=wid; } }
-        if(w===undefined && state.koWin[m]!=null && (state.koWin[m]===a||state.koWin[m]===b)) w=state.koWin[m];
+        if(includePicks && w===undefined && state.koWin[m]!=null && (state.koWin[m]===a||state.koWin[m]===b)) w=state.koWin[m];
       }
       if(w!==undefined) eff.winners[m]=w;
     });
-    eff.koWin=Object.assign({}, state.koWin, eff.realKoWin);
+    eff.koWin = includePicks ? Object.assign({}, state.koWin, eff.realKoWin) : eff.realKoWin;
     return eff;
   }
 
   // ---- compute (Monte Carlo) ----
+  // Fixed seeds so the live runs are deterministic: Fair % is stable between recomputes and only
+  // moves when real results change; the baseline shares SEED_FAIR so at zero results resultsRun===baseline
+  // exactly ⇒ Fair % == the published market price (no Monte-Carlo jitter).
+  const SEED_FAIR=0x9e3779b1, SEED_SCN=0x85ebca77;
+  let _baseline=null, _baseSims=null;
+  function getBaseline(){
+    if(_baseline && _baseSims===state.sims) return _baseline;
+    _baseline = eng.run({}, state.sims, SEED_FAIR); _baseSims=state.sims;
+    return _baseline;
+  }
+  function hasManualPicks(){
+    if(Object.keys(state.koWin).length) return true;
+    if(GROUPS.some(L=>state.thirdAdvance[L])) return true;
+    return GROUPS.some(L=>{ const gp=state.groupPos[L]; return gp[1]!=null||gp[2]!=null||gp[3]!=null; });
+  }
+  // Market-anchor a champ vector: Fair = marketProb * run.champ / baseline.champ.
+  // Guards baseline.champ≈0 (sub-0.1% teams) by falling back to marketProb (numerator is ~0 there too).
+  function anchorChamp(champ, base){
+    return T.map((t,i)=> base[i]>1e-6 ? t.marketProb*champ[i]/base[i] : t.marketProb);
+  }
   let computeTimer=null, computing=false, seedCtr=1;
   function scheduleCompute(){
     if(computeTimer) clearTimeout(computeTimer);
@@ -772,9 +795,16 @@
   }
   function runCompute(){
     computing=true;
-    const fixes=buildFixes();
     const t0=performance.now();
-    lastStats = eng.run(fixes, state.sims, (seedCtr++*2654435761)>>>0);
+    const base=getBaseline();
+    // Fair %: condition on REAL results only, market-anchored.
+    const resultsRun=eng.run(buildFixes(false), state.sims, SEED_FAIR);
+    fairArr=anchorChamp(resultsRun.champ, base.champ);
+    // Scn %: results + manual picks. Skip the second run when there are no picks (then Scn == Fair).
+    const picks=hasManualPicks();
+    const fullRun=picks ? eng.run(buildFixes(true), state.sims, SEED_SCN) : resultsRun;
+    scnArr=picks ? anchorChamp(fullRun.champ, base.champ) : fairArr;
+    lastStats=fullRun; // progression columns + bracket/groups render the scenario, as before
     const dt=Math.round(performance.now()-t0);
     computing=false;
     renderAll();
@@ -791,9 +821,9 @@
     {k:'rank',label:'#',tip:'Row rank in the currently sorted column (default: Fair %). Click any header to sort.'},
     {k:'name',label:'Team',tip:'National team. Click a header to re-sort the table.'},
     {k:'grp',label:'Grp',tip:'Group (A–L) the team was drawn into.'},
-    {k:'mkt',label:'Fair %',tip:'FAIR (reference) probability to WIN THE TOURNAMENT. Derived from the consensus sportsbook market, de-vigged (vig removed) and calibrated by simulation. This is your “true” baseline to compare against Polymarket.'},
+    {k:'mkt',label:'Fair %',tip:'FAIR (reference) probability to WIN THE TOURNAMENT. The de-vigged, calibrated sportsbook baseline — now conditioned LIVE on completed match results: it equals the published market price before a team plays, and drops toward 0 as a team is eliminated. Manual bracket picks do NOT affect it (those are the Scn % column). This is your “true” baseline to compare against Polymarket.'},
     {k:'scn',label:'Scn %',tip:'SCENARIO probability to win the tournament given current real results + your manual group/bracket picks. Updates live as you pick or as matches finish.'},
-    {k:'delta',label:'Δ pp',tip:'Scn % minus Fair %, in percentage points. How far your picks / actual results have moved this team away from the market baseline. + = better than baseline.'},
+    {k:'delta',label:'Δ pp',tip:'Scn % minus Fair %, in percentage points. Since both now share the same live results, this isolates the effect of YOUR manual group/bracket picks on top of reality. + = your picks favour this team. 0 = no picks made.'},
     {k:'pm',label:'Poly %',tip:'Polymarket’s implied probability = its current YES price (e.g. $0.17 → 17%). Editable — type to override; “Live Polymarket” fills it from the exchange. Green border = real fetched price.'},
     {k:'edge',label:'Edge pp',tip:'Reference % minus Polymarket %, in percentage points. Positive = Polymarket is pricing the team BELOW fair value (cheap).'},
     {k:'ev',label:'EV %',tip:'Expected value of BUYING a YES share at the Polymarket price = Reference ÷ Polymarket − 1. +20% means a $1 stake is worth ~$1.20 at fair value. Drives the Signal.'},
@@ -803,12 +833,12 @@
     {k:'sf',label:'SF %',tip:'Probability the team reaches the semi-finals.'},
     {k:'fin',label:'Final %',tip:'Probability the team reaches the final.'},
   ];
-  function refProb(i){ return state.ref==='market'? T[i].marketProb : lastStats.champ[i]; }
+  function refProb(i){ return state.ref==='market'? fairArr[i] : scnArr[i]; }
   function rowData(){
     const pm = window.__pm || (window.__pm = T.map(t=>t.pmPrefill));
     return T.map((t,i)=>{
       const ref=refProb(i);
-      const mkt=t.marketProb, scn=lastStats.champ[i];
+      const mkt=fairArr[i], scn=scnArr[i];
       const pmv=pm[i];
       const pmp=pmv/100;
       const edge=(ref*100)-pmv;
